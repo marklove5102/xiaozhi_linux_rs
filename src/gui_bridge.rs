@@ -15,8 +15,8 @@ pub struct GuiBridge {
 
 impl GuiBridge {
     pub async fn new(config: &Config, tx: mpsc::Sender<GuiEvent>) -> anyhow::Result<Self> {
-        let socket = UdpSocket::bind(format!("0.0.0.0:{}", config.ui_port_up)).await?;
-        let target_addr = format!("127.0.0.1:{}", config.ui_port_down);
+        let socket = UdpSocket::bind(format!("0.0.0.0:{}", config.gui_local_port)).await?;
+        let target_addr = format!("127.0.0.1:{}", config.gui_remote_port);
 
         Ok(Self {
             socket: Arc::new(socket),

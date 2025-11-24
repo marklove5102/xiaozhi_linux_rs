@@ -11,6 +11,17 @@ use net_link::{NetCommand, NetEvent, NetLink};
 use state_machine::SystemState;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct ServerMessage {
+    #[serde(rename = "type")]
+    msg_type: String,
+    // For "iot" type
+    command: Option<String>,
+    // For "tts" type
+    text: Option<String>,
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -73,12 +84,29 @@ async fn main() -> anyhow::Result<()> {
                     // 如果接收到服务器的文本消息，就转发给GUI
                     NetEvent::Text(text) => {
                         println!("Received Text from Server: {}", text);
+                        
+                        // Try to parse as JSON to handle specific message types
+                        if let Ok(msg) = serde_json::from_str::<ServerMessage>(&text) {
+                            match msg.msg_type.as_str() {
+                                "iot" => {
+                                    if let Some(cmd) = msg.command {
+                                        println!("Received IoT Command: {}", cmd);
+                                        // TODO: Handle IoT command (e.g. call HomeAssistant API)
+                                    }
+                                }
+                                "tts" => {
+                                    // Forward TTS text to GUI if needed, or just log
+                                    if let Some(t) = msg.text {
+                                        println!("TTS: {}", t);
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+
                         if let Err(e) = gui_bridge.send_message(&text).await {
                             eprintln!("Failed to send to GUI: {}", e);
                         }
-
-                        // Simple state update based on server messages (example)
-                        // You might want to parse the JSON here to update state
                     }
 
                     // 如果接收到服务器的二进制音频数据，就转发给音频桥播放
@@ -124,6 +152,10 @@ async fn main() -> anyhow::Result<()> {
                              // Forward to Server
                              let _ = tx_net_cmd.send(NetCommand::SendBinary(data)).await;
                         }
+                    }
+                    AudioEvent::Command(cmd) => {
+                        println!("Received Command from AudioBridge: {:?}", cmd);
+                        // Handle commands from sound_app if any
                     }
                 }
             }

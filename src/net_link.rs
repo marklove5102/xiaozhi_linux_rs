@@ -3,6 +3,9 @@ use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
 use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
+use mac_address::get_mac_address;
+use uuid::Uuid;
+use url::Url;
 
 #[derive(Debug)]
 pub enum NetEvent {
@@ -33,6 +36,7 @@ struct HelloMessage {
     version: u8,
     transport: String,
     audio_params: AudioParams,
+    device_id: String,
 }
 
 pub struct NetLink {
@@ -52,20 +56,46 @@ impl NetLink {
 
     // 主运行循环，如果发生错误断开连接，5秒后重连
     pub async fn run(mut self) {
+        let mut retry_delay = 1;
         loop {
             if let Err(e) = self.connect_and_loop().await {
-                eprintln!("Connection error: {}. Retrying in 5s...", e);
+                eprintln!("Connection error: {}. Retrying in {}s...", e, retry_delay);
                 let _ = self.tx.send(NetEvent::Disconnected).await;
-                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(retry_delay)).await;
+                retry_delay = std::cmp::min(retry_delay * 2, 60);
+            } else {
+                // If it returns Ok, it might mean clean exit or just a disconnect that wasn't caught as Err?
+                // In our case, connect_and_loop returns Err on disconnect.
+                // If it returns Ok, it means we are shutting down (rx_cmd closed).
+                break;
             }
         }
     }
 
     async fn connect_and_loop(&mut self) -> anyhow::Result<()> {
+        // Get MAC address for device_id if not configured
+        let device_id = if self.config.device_id == "unknown-device" {
+             match get_mac_address() {
+                Ok(Some(mac)) => mac.to_string(),
+                _ => Uuid::new_v4().to_string(),
+            }
+        } else {
+            self.config.device_id.clone()
+        };
+
+        let url = Url::parse(&self.config.ws_url)?;
+        let host = url.host_str().unwrap_or("api.xiaozhi.me");
+
         let request = tokio_tungstenite::tungstenite::http::Request::builder()
+            .method("GET")
             .uri(&self.config.ws_url)
+            .header("Host", host)
+            .header("Connection", "Upgrade")
+            .header("Upgrade", "websocket")
+            .header("Sec-WebSocket-Version", "13")
+            .header("Sec-WebSocket-Key", tokio_tungstenite::tungstenite::handshake::client::generate_key())
             .header("Authorization", format!("Bearer {}", self.config.ws_token))
-            .header("Device-Id", &self.config.device_id)
+            .header("Device-Id", &device_id)
             .header("Protocol-Version", "1")
             .body(())?;
 
@@ -88,24 +118,31 @@ impl NetLink {
                 channels: 1,
                 frame_duration: 60,
             },
+            device_id: device_id.clone(),
         };
         let hello_json = serde_json::to_string(&hello)?;
         write.send(Message::Text(hello_json.into())).await?;
 
         loop {
             tokio::select! {
-                Some(msg) = read.next() => {
-                    match msg? {
-                        Message::Text(text) => {
-                            self.tx.send(NetEvent::Text(text.to_string())).await?;
+                msg = read.next() => {
+                    match msg {
+                        Some(Ok(msg)) => {
+                            match msg {
+                                Message::Text(text) => {
+                                    self.tx.send(NetEvent::Text(text.to_string())).await?;
+                                }
+                                Message::Binary(data) => {
+                                    self.tx.send(NetEvent::Binary(data.to_vec())).await?;
+                                }
+                                Message::Close(_) => {
+                                    return Err(anyhow::anyhow!("Connection closed"));
+                                }
+                                _ => {}
+                            }
                         }
-                        Message::Binary(data) => {
-                            self.tx.send(NetEvent::Binary(data.to_vec())).await?;
-                        }
-                        Message::Close(_) => {
-                            return Err(anyhow::anyhow!("Connection closed"));
-                        }
-                        _ => {}
+                        Some(Err(e)) => return Err(e.into()),
+                        None => return Err(anyhow::anyhow!("Connection closed")),
                     }
                 }
                 Some(cmd) = self.rx_cmd.recv() => {

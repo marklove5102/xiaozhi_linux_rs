@@ -3,8 +3,18 @@ use std::sync::Arc;
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 
+use serde::Deserialize;
+
 pub enum AudioEvent {
     AudioData(Vec<u8>),
+    Command(AudioMessage),
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AudioMessage {
+    pub session_id: Option<String>,
+    pub text: Option<String>,
+    // Add other fields as needed
 }
 
 pub struct AudioBridge {
@@ -15,8 +25,8 @@ pub struct AudioBridge {
 
 impl AudioBridge {
     pub async fn new(config: &Config, tx: mpsc::Sender<AudioEvent>) -> anyhow::Result<Self> {
-        let socket = UdpSocket::bind(format!("0.0.0.0:{}", config.audio_port_up)).await?;
-        let target_addr = format!("127.0.0.1:{}", config.audio_port_down);
+        let socket = UdpSocket::bind(format!("0.0.0.0:{}", config.audio_local_port)).await?;
+        let target_addr = format!("127.0.0.1:{}", config.audio_remote_port);
 
         Ok(Self {
             socket: Arc::new(socket),
@@ -30,11 +40,27 @@ impl AudioBridge {
         loop {
             let (len, _) = self.socket.recv_from(&mut buf).await?;
             if len > 0 {
-                let data = buf[..len].to_vec();
-                // Forward to main loop
-                if let Err(e) = self.tx.send(AudioEvent::AudioData(data)).await {
-                    eprintln!("Failed to send audio event: {}", e);
-                    break;
+                let data = &buf[..len];
+                
+                // Optimization: Try to parse as JSON only if it looks like JSON (starts with '{')
+                // This avoids expensive parsing for every audio frame
+                if data[0] == b'{' {
+                    if let Ok(msg) = serde_json::from_slice::<AudioMessage>(data) {
+                        if let Err(e) = self.tx.send(AudioEvent::Command(msg)).await {
+                            eprintln!("Failed to send audio command: {}", e);
+                            break;
+                        }
+                        continue;
+                    }
+                }
+
+                // Treat as audio data
+                // Filter out very small packets which might be noise or keep-alives
+                if len > 10 {
+                    if let Err(e) = self.tx.send(AudioEvent::AudioData(data.to_vec())).await {
+                        eprintln!("Failed to send audio event: {}", e);
+                        break;
+                    }
                 }
             }
         }
