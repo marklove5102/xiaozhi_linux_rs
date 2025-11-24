@@ -78,7 +78,7 @@ impl NetLink {
         // Get MAC address for device_id if not configured
         let device_id = if self.config.device_id == "unknown-device" {
              match get_mac_address() {
-                Ok(Some(mac)) => mac.to_string(),
+                Ok(Some(mac)) => mac.to_string().to_lowercase(), // Ensure lowercase to match typical Linux behavior
                 _ => Uuid::new_v4().to_string(),
             }
         } else {
@@ -104,6 +104,7 @@ impl NetLink {
             .body(())?;
 
         println!("Connecting to {}...", self.config.ws_url);
+        println!("Headers: {:?}", request.headers()); // Debug headers
         let (ws_stream, _) = connect_async(request).await?;
         println!("Connected!");
 
@@ -112,19 +113,19 @@ impl NetLink {
         self.tx.send(NetEvent::Connected).await?;
 
         // 发送Hello消息进行初始化链接
-        let hello = HelloMessage {
-            msg_type: "hello".to_string(),
-            version: 1,
-            transport: "websocket".to_string(),
-            audio_params: AudioParams {
-                format: "opus".to_string(),
-                sample_rate: 16000,
-                channels: 1,
-                frame_duration: 60,
-            },
-            // device_id: device_id.clone(),
-        };
-        let hello_json = serde_json::to_string(&hello)?;
+        // Use raw JSON string to match C++ implementation exactly
+        let hello_json = r#"{
+            "type": "hello",
+            "version": 1,
+            "transport": "websocket",
+            "audio_params": {
+                "format": "opus",
+                "sample_rate": 16000,
+                "channels": 1,
+                "frame_duration": 60
+            }
+        }"#;
+        
         println!("Sending Hello: {}", hello_json);
         write.send(Message::Text(hello_json.into())).await?;
 

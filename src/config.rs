@@ -8,6 +8,7 @@ pub struct Config {
     pub gui_local_port: u16,
     pub gui_remote_port: u16,
     pub ws_url: String,
+    pub ota_url: String,
     pub ws_token: String,
     pub device_id: String,
     pub client_id: String,
@@ -16,12 +17,13 @@ pub struct Config {
 impl Config {
     pub fn new() -> Result<Self, config::ConfigError> {
         let s = ConfigLoader::builder()
-            // 1. Default values
+            // Default values
             .set_default("audio_local_port", 5676)?
             .set_default("audio_remote_port", 5677)?
             .set_default("gui_local_port", 5678)?
             .set_default("gui_remote_port", 5679)?
             .set_default("ws_url", "wss://api.tenclass.net/xiaozhi/v1/")?
+            .set_default("ota_url", "https://api.tenclass.net/xiaozhi/ota/")?
             .set_default("ws_token", "test-token")?
             .set_default("device_id", "unknown-device")?
             .set_default("client_id", "unknown-client")?
@@ -47,6 +49,7 @@ impl Default for Config {
                 gui_local_port: 5678,
                 gui_remote_port: 5679,
                 ws_url: "wss://api.tenclass.net/xiaozhi/v1/".to_string(),
+                ota_url: "https://api.tenclass.net/xiaozhi/ota/".to_string(),
                 ws_token: "test-token".to_string(),
                 device_id: "unknown-device".to_string(),
                 client_id: "unknown-client".to_string(),

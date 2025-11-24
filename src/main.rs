@@ -37,17 +37,33 @@ async fn main() -> anyhow::Result<()> {
     // 设备id和客户端id的处理
     if config.device_id == "unknown-device" {
         config.device_id = match get_mac_address() {
-            Ok(Some(mac)) => mac.to_string(),
+            Ok(Some(mac)) => mac.to_string().to_lowercase(),
             _ => Uuid::new_v4().to_string(),
         };
     }
+    
+    // Client ID (UUID) persistence
+    // Try to read from local file first to maintain identity across restarts
+    let uuid_file_path = "xiaozhi_uuid.txt";
     if config.client_id == "unknown-client" {
-        // In C++, client_id (uuid) is read from config or generated.
-        // Here we generate one if missing. Ideally we should save it back.
-        // For now, we just generate it in memory, which means re-activation on restart if not saved.
-        // TODO: Implement saving config back to file.
+        if let Ok(content) = std::fs::read_to_string(uuid_file_path) {
+            let trimmed = content.trim();
+            if !trimmed.is_empty() {
+                config.client_id = trimmed.to_string();
+                println!("Loaded Client ID from file: {}", config.client_id);
+            }
+        }
+    }
+
+    if config.client_id == "unknown-client" {
         config.client_id = Uuid::new_v4().to_string();
         println!("Generated new Client ID: {}", config.client_id);
+        // Save to file
+        if let Err(e) = std::fs::write(uuid_file_path, &config.client_id) {
+            eprintln!("Failed to save Client ID to file: {}", e);
+        } else {
+            println!("Saved Client ID to {}", uuid_file_path);
+        }
     }
 
     // 创建通道，用于组件间通信
