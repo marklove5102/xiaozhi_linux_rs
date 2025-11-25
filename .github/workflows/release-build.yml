@@ -19,7 +19,7 @@ jobs:
       matrix:
         include:
           - target: armv7-unknown-linux-musleabihf
-            asset_suffix: echo-mate-armv7-musleabihf
+            asset_suffix: armv7-musleabihf
             env_rustflags: "-C target-feature=+crt-static"
 
 
@@ -46,7 +46,7 @@ jobs:
       - name: "5. Build Static Binary"
         id: build
         env:
-          PROGRAM_NAME: "provisioner"
+          PROGRAM_NAME: "xiaozhi_linux_core"
         run: |
           BUILD_COMMAND="cross build --target=${{ matrix.target }} --release"
           if [ -n "${{ matrix.features }}" ]; then
