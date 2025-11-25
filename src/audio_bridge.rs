@@ -21,22 +21,24 @@ pub struct AudioBridge {
     socket: Arc<UdpSocket>,
     target_addr: String,
     tx: mpsc::Sender<AudioEvent>,
+    buffer_size: usize,
 }
 
 impl AudioBridge {
     pub async fn new(config: &Config, tx: mpsc::Sender<AudioEvent>) -> anyhow::Result<Self> {
-        let socket = UdpSocket::bind(format!("0.0.0.0:{}", config.audio_local_port)).await?;
-        let target_addr = format!("127.0.0.1:{}", config.audio_remote_port);
+        let socket = UdpSocket::bind(format!("{}:{}", config.audio_local_ip, config.audio_local_port)).await?;
+        let target_addr = format!("{}:{}", config.audio_remote_ip, config.audio_remote_port);
 
         Ok(Self {
             socket: Arc::new(socket),
             target_addr,
             tx,
+            buffer_size: config.audio_buffer_size,
         })
     }
 
     pub async fn run(&self) -> anyhow::Result<()> {
-        let mut buf = [0u8; 2048]; // 缓冲区大小为2KB
+        let mut buf = vec![0u8; self.buffer_size];
         loop {
             let (len, _) = self.socket.recv_from(&mut buf).await?;
             if len > 0 {

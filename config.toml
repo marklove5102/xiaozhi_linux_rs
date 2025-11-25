@@ -5,3 +5,42 @@ version = "1.0.0"
 [board]
 type = "xiaozhi"
 name = "小智"
+
+# 音频进程配置
+[audio]
+local_port = 5676
+remote_port = 5677
+local_ip = "0.0.0.0"
+remote_ip = "127.0.0.1"
+buffer_size = 2048
+
+# GUI进程配置
+[gui]
+local_port = 5678
+remote_port = 5679
+local_ip = "0.0.0.0"
+remote_ip = "127.0.0.1"
+buffer_size = 4096
+
+# IoT进程配置
+[iot]
+local_port = 5680
+remote_port = 5681
+local_ip = "0.0.0.0"
+remote_ip = "127.0.0.1"
+buffer_size = 4096
+
+# 网络配置
+[network]
+ws_url = "wss://api.tenclass.net/xiaozhi/v1/"
+ota_url = "https://api.tenclass.net/xiaozhi/ota/"
+ws_token = "test-token"
+device_id = "unknown-device"
+client_id = "unknown-client"
+
+# Hello消息参数
+[hello_message]
+format = "opus"
+sample_rate = 24000
+channels = 1
+frame_duration = 20

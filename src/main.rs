@@ -188,7 +188,7 @@ async fn main() -> anyhow::Result<()> {
 
                             match msg.msg_type.as_str() {
                                 "hello" => {
-                                    // 【关键握手步骤】收到服务端的 Hello 响应后，发送"开启聆听"指令
+                                    // 收到服务端的 Hello 响应后，发送"开启聆听"指令
                                     println!("Server Hello received. Starting listen mode...");
                                     let listen_cmd = r#"{"session_id":"","type":"listen","state":"start","mode":"auto"}"#;
                                     if let Err(e) = tx_net_cmd.send(NetCommand::SendText(listen_cmd.to_string())).await {
@@ -215,7 +215,7 @@ async fn main() -> anyhow::Result<()> {
                                             should_mute_mic = false;
                                             println!("TTS Stopped, unmuting mic");
                                             
-                                            // 【关键修复】TTS 结束后，自动发送指令告诉服务器重新开始监听，实现连续对话
+                                            // TTS 结束后，自动发送指令告诉服务器重新开始监听，实现连续对话
                                             let session_id = current_session_id.as_deref().unwrap_or("");
                                             let listen_cmd = format!(
                                                 r#"{{"session_id":"{}","type":"listen","state":"start","mode":"auto"}}"#,
@@ -253,7 +253,6 @@ async fn main() -> anyhow::Result<()> {
 
                     // 如果接收到服务器的二进制音频数据，就转发给音频桥播放
                     NetEvent::Binary(data) => {
-                        println!("Received Audio from Server: {} bytes", data.len());
                         if current_state != SystemState::Speaking {
                             current_state = SystemState::Speaking;
                             // Notify GUI: kDeviceStateSpeaking = 6
@@ -349,7 +348,6 @@ async fn main() -> anyhow::Result<()> {
                 match event {
                     IotEvent::Message(msg) => {
                         println!("Received Message from IoT: {}", msg);
-                        // Forward to Server (e.g. descriptors or state updates)
                         if let Err(e) = tx_net_cmd.send(NetCommand::SendText(msg)).await {
                             eprintln!("Failed to send text to NetLink: {}", e);
                         }

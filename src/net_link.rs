@@ -89,12 +89,12 @@ impl NetLink {
         };
 
         // 根据配置构建WebSocket请求
-        let url = Url::parse(&self.config.ws_url)?;
+        let url = Url::parse(self.config.ws_url)?;
         let host = url.host_str().unwrap_or("api.tenclass.net");
 
         let request = tokio_tungstenite::tungstenite::http::Request::builder()
             .method("GET")
-            .uri(&self.config.ws_url)
+            .uri(self.config.ws_url)
             .header("Host", host)
             .header("Connection", "Upgrade")
             .header("Upgrade", "websocket")
@@ -124,10 +124,10 @@ impl NetLink {
             version: 1,
             transport: "websocket".to_string(),
             audio_params: AudioParams {
-                format: "opus".to_string(),
-                sample_rate: 24000,
-                channels: 1,
-                frame_duration: 20,
+                format: self.config.hello_format.to_string(),
+                sample_rate: self.config.hello_sample_rate,
+                channels: self.config.hello_channels,
+                frame_duration: self.config.hello_frame_duration,
             },
         };
         let hello_json = serde_json::to_string(&hello_msg)?;

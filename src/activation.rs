@@ -30,7 +30,7 @@ pub enum ActivationResult {
 pub async fn check_device_activation(config: &Config) -> ActivationResult {
     // 构造 HTTP URL
     // 从配置文件读取
-    let http_url = &config.ota_url;
+    let http_url = config.ota_url;
     
     let client = Client::new();
 
