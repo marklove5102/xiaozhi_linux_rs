@@ -17,7 +17,7 @@ pub struct Config {
 impl Config {
     pub fn new() -> Result<Self, config::ConfigError> {
         let s = ConfigLoader::builder()
-            // Default values
+            // 默认值
             .set_default("audio_local_port", 5676)?
             .set_default("audio_remote_port", 5677)?
             .set_default("gui_local_port", 5678)?

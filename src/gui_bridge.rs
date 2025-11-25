@@ -13,8 +13,10 @@ pub struct GuiBridge {
     tx: mpsc::Sender<GuiEvent>,
 }
 
+// GUI进程和Core进程通过本地UDP通信，端口在配置中指定
 impl GuiBridge {
     pub async fn new(config: &Config, tx: mpsc::Sender<GuiEvent>) -> anyhow::Result<Self> {
+        // 绑定本地UDP端口
         let socket = UdpSocket::bind(format!("0.0.0.0:{}", config.gui_local_port)).await?;
         let target_addr = format!("127.0.0.1:{}", config.gui_remote_port);
 
@@ -26,8 +28,9 @@ impl GuiBridge {
     }
 
     pub async fn run(&self) -> anyhow::Result<()> {
-        let mut buf = [0u8; 4096];
+        let mut buf = [0u8; 4096]; // 4KB缓冲区
         loop {
+            // 通过UDP socket接收消息
             let (len, _) = self.socket.recv_from(&mut buf).await?;
             if len > 0 {
                 if let Ok(msg) = std::str::from_utf8(&buf[..len]) {

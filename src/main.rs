@@ -16,14 +16,14 @@ use serde::Deserialize;
 use mac_address::get_mac_address;
 use uuid::Uuid;
 
+
+// 服务器消息结构体
 #[derive(Deserialize)]
 struct ServerMessage {
     #[serde(rename = "type")]
     msg_type: String,
-    // For "iot" type
-    command: Option<String>,
-    // For "tts" type
-    text: Option<String>,
+    command: Option<String>, // 用于IOT类型
+    text: Option<String>, // 用于TTS文本
 }
 
 #[tokio::main]
@@ -42,8 +42,7 @@ async fn main() -> anyhow::Result<()> {
         };
     }
     
-    // Client ID (UUID) persistence
-    // Try to read from local file first to maintain identity across restarts
+    // 设备端UUID，先从本地文件读取以保持重启间身份一致，如果不存在则生成新的并保存
     let uuid_file_path = "xiaozhi_uuid.txt";
     if config.client_id == "unknown-client" {
         if let Ok(content) = std::fs::read_to_string(uuid_file_path) {
@@ -55,6 +54,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // 生成新的UUID并保存
     if config.client_id == "unknown-client" {
         config.client_id = Uuid::new_v4().to_string();
         println!("Generated new Client ID: {}", config.client_id);
@@ -67,7 +67,6 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // 创建通道，用于组件间通信
-
     // 事件通道
     let (tx_net_event, mut rx_net_event) = mpsc::channel::<NetEvent>(100);
 
@@ -80,8 +79,9 @@ async fn main() -> anyhow::Result<()> {
     // GUI通道
     let (tx_gui_event, mut rx_gui_event) = mpsc::channel::<GuiEvent>(100);
 
-    // 启动GUI桥，与GUI进程通信 (Early start for activation display)
+    // 启动GUI桥，与GUI进程通信，优先启动，用于播报激活状态或者激活码
     let gui_bridge = Arc::new(GuiBridge::new(&config, tx_gui_event).await?);
+    // clone一份，用于异步任务，还要用原始的gui_bridge在主循环中发送消息
     let gui_bridge_clone = gui_bridge.clone();
     tokio::spawn(async move {
         if let Err(e) = gui_bridge_clone.run().await {
@@ -102,7 +102,7 @@ async fn main() -> anyhow::Result<()> {
                 
                 // GUI 显示验证码
                 let gui_msg = format!(r#"{{"type":"activation", "code":"{}"}}"#, code);
-                let _ = gui_bridge.send_message(&gui_msg).await;
+                let _ = gui_bridge.send_message(&gui_msg).await; // 通知 GUI 显示激活码
                 
                 // TTS 播报 
                 // 简单做法：假设 sound_app 能播报数字
@@ -155,11 +155,11 @@ async fn main() -> anyhow::Result<()> {
                                 "iot" => {
                                     if let Some(cmd) = msg.command {
                                         println!("Received IoT Command: {}", cmd);
-                                        // TODO: Handle IoT command (e.g. call HomeAssistant API)
+                                        // 如果是IOT命令，在这里实现对应的操作，暂时留空
                                     }
                                 }
                                 "tts" => {
-                                    // Forward TTS text to GUI if needed, or just log
+                                    // 转发给GUI显示TTS文本
                                     if let Some(t) = msg.text {
                                         println!("TTS: {}", t);
                                     }
@@ -199,7 +199,7 @@ async fn main() -> anyhow::Result<()> {
                         // Notify GUI: kDeviceStateConnecting = 4 (or Error = 9)
                         let _ = gui_bridge.send_message(r#"{"state": 4}"#).await;
                         
-                        // TODO: Clear audio buffer if any
+                        // 清理音频缓冲区（如果有的话）
                     }
                 }
             }
@@ -208,22 +208,22 @@ async fn main() -> anyhow::Result<()> {
             Some(event) = rx_audio_event.recv() => {
                 match event {
                     AudioEvent::AudioData(data) => {
-                        // println!("Received Audio from Mic: {} bytes", data.len());
+                        // 打印收到的音频数据长度
+                        println!("Received Audio from Mic: {} bytes", data.len());
                         
-                        // Always forward audio to server to support barge-in (interruption)
-                        // The server VAD will decide if user is speaking and send stop command
-                        
+                        // 无论何情况都转发音频到服务器以支持插入式对话（打断），服务端会进行VAD判断用户是否在说话并发送停止命令
                         if current_state != SystemState::Listening {
                              current_state = SystemState::Listening;
                              // Notify GUI: kDeviceStateListening = 5
                              let _ = gui_bridge.send_message(r#"{"state": 5}"#).await;
                         }
-                        // Forward to Server
+                        // 把音频数据转发给服务器
                         let _ = tx_net_cmd.send(NetCommand::SendBinary(data)).await;
                     }
                     AudioEvent::Command(cmd) => {
                         println!("Received Command from AudioBridge: {:?}", cmd);
                         // Handle commands from sound_app if any
+                        // 处理音频命令，比如播放结束等
                     }
                 }
             }

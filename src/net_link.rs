@@ -1,11 +1,11 @@
 use crate::config::Config;
 use futures_util::{SinkExt, StreamExt};
+use mac_address::get_mac_address;
 use serde::Serialize;
 use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
-use mac_address::get_mac_address;
-use uuid::Uuid;
 use url::Url;
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub enum NetEvent {
@@ -21,6 +21,7 @@ pub enum NetCommand {
     SendBinary(Vec<u8>),
 }
 
+// 音频参数结构体
 #[derive(Serialize)]
 struct AudioParams {
     format: String,
@@ -57,6 +58,7 @@ impl NetLink {
 
     // 如果发生错误断开连接，5秒后重连
     pub async fn run(mut self) {
+        // 重试机制，指数退避
         let mut retry_delay = 1;
         loop {
             if let Err(e) = self.connect_and_loop().await {
@@ -65,6 +67,7 @@ impl NetLink {
                 tokio::time::sleep(tokio::time::Duration::from_secs(retry_delay)).await;
                 retry_delay = std::cmp::min(retry_delay * 2, 60);
             } else {
+                // 如果连接和主循环正常退出，重置重试延迟
                 // If it returns Ok, it might mean clean exit or just a disconnect that wasn't caught as Err?
                 // In our case, connect_and_loop returns Err on disconnect.
                 // If it returns Ok, it means we are shutting down (rx_cmd closed).
@@ -75,14 +78,14 @@ impl NetLink {
 
     // 进入连接和主循环，处理WebSocket消息和发送命令
     async fn connect_and_loop(&mut self) -> anyhow::Result<()> {
-        // Get MAC address for device_id if not configured
+        // 如果设备ID是unknown-device，则尝试获取MAC地址作为设备ID
         let device_id = if self.config.device_id == "unknown-device" {
-             match get_mac_address() {
-                Ok(Some(mac)) => mac.to_string().to_lowercase(), // Ensure lowercase to match typical Linux behavior
-                _ => Uuid::new_v4().to_string(),
+            match get_mac_address() {
+                Ok(Some(mac)) => mac.to_string().to_lowercase(), // Ensure lowercase to match typical Linux behavior 注意大小写一致，以匹配典型的Linux行为
+                _ => Uuid::new_v4().to_string(), // 如果无法获取MAC地址，则生成新的UUID
             }
         } else {
-            self.config.device_id.clone()
+            self.config.device_id.clone() // 使用配置中的设备ID
         };
 
         // 根据配置构建WebSocket请求
@@ -96,7 +99,10 @@ impl NetLink {
             .header("Connection", "Upgrade")
             .header("Upgrade", "websocket")
             .header("Sec-WebSocket-Version", "13")
-            .header("Sec-WebSocket-Key", tokio_tungstenite::tungstenite::handshake::client::generate_key())
+            .header(
+                "Sec-WebSocket-Key",
+                tokio_tungstenite::tungstenite::handshake::client::generate_key(),
+            )
             .header("Authorization", format!("Bearer {}", self.config.ws_token))
             .header("Device-Id", &device_id)
             .header("Client-Id", &self.config.client_id)
@@ -125,10 +131,11 @@ impl NetLink {
                 "frame_duration": 60
             }
         }"#;
-        
+
         println!("Sending Hello: {}", hello_json);
         write.send(Message::Text(hello_json.into())).await?;
 
+        // 主循环，处理读取和写入
         loop {
             tokio::select! {
                 msg = read.next() => {
@@ -136,7 +143,7 @@ impl NetLink {
                         Some(Ok(msg)) => {
                             match msg {
                                 Message::Text(text) => {
-                                    // println!("Received Text: {}", text); // Debug log
+                                    println!("Received Text: {}", text);
                                     self.tx.send(NetEvent::Text(text.to_string())).await?;
                                 }
                                 Message::Binary(data) => {

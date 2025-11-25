@@ -36,14 +36,13 @@ impl AudioBridge {
     }
 
     pub async fn run(&self) -> anyhow::Result<()> {
-        let mut buf = [0u8; 2048]; // Adjust buffer size as needed
+        let mut buf = [0u8; 2048]; // 缓冲区大小为2KB
         loop {
             let (len, _) = self.socket.recv_from(&mut buf).await?;
             if len > 0 {
                 let data = &buf[..len];
-                
-                // Treat as audio data
-                // Filter out very small packets which might be noise or keep-alives
+            
+                // 如果数据包长度大于10字节则认为是有效音频数据
                 if len > 10 {
                     if let Err(e) = self.tx.send(AudioEvent::AudioData(data.to_vec())).await {
                         eprintln!("Failed to send audio event: {}", e);
