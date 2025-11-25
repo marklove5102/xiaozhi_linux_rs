@@ -127,7 +127,7 @@ impl NetLink {
                 format: "opus".to_string(),
                 sample_rate: 24000,
                 channels: 1,
-                frame_duration: 60,
+                frame_duration: 20,
             },
         };
         let hello_json = serde_json::to_string(&hello_msg)?;

@@ -214,6 +214,18 @@ async fn main() -> anyhow::Result<()> {
                                         } else if state == "stop" {
                                             should_mute_mic = false;
                                             println!("TTS Stopped, unmuting mic");
+                                            
+                                            // 【关键修复】TTS 结束后，自动发送指令告诉服务器重新开始监听，实现连续对话
+                                            let session_id = current_session_id.as_deref().unwrap_or("");
+                                            let listen_cmd = format!(
+                                                r#"{{"session_id":"{}","type":"listen","state":"start","mode":"auto"}}"#,
+                                                session_id
+                                            );
+                                            
+                                            println!("Sending Auto-Listen Command after TTS");
+                                            if let Err(e) = tx_net_cmd.send(NetCommand::SendText(listen_cmd)).await {
+                                                eprintln!("Failed to send loop listen command: {}", e);
+                                            }
                                         }
                                     }
 
