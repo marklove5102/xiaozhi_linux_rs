@@ -151,6 +151,7 @@ impl Config {
     }
 }
 
+// 为 Config 实现 Default trait，使用编译时环境变量的默认值
 impl Default for Config {
     fn default() -> Self {
         Self::default_from_build()
