@@ -187,7 +187,7 @@ rustup toolchain install nightly
 rustup component add rust-src --toolchain nightly
 
 # 使用提供的编译脚本
-./boards/rv1106_uclibceabihf/armv7_uclibc_build.sh
+./scripts/armv7-unknown-linux-uclibceabihf/build.sh
 
 # 编译输出：target/armv7-unknown-linux-uclibceabihf/release/xiaozhi_linux_rs
 ```
