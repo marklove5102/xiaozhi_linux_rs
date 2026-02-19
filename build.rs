@@ -30,11 +30,6 @@ struct Board {
 
 #[derive(Deserialize)]
 struct Audio {
-    local_port: u16,
-    remote_port: u16,
-    local_ip: String,
-    remote_ip: String,
-    buffer_size: usize,
     capture_device: String,
     playback_device: String,
 }
@@ -97,21 +92,7 @@ fn main() {
     println!("cargo:rustc-env=BOARD_TYPE={}", config.board.type_);
     println!("cargo:rustc-env=BOARD_NAME={}", config.board.name);
 
-    // 音频配置
-    println!(
-        "cargo:rustc-env=AUDIO_LOCAL_PORT={}",
-        config.audio.local_port
-    );
-    println!(
-        "cargo:rustc-env=AUDIO_REMOTE_PORT={}",
-        config.audio.remote_port
-    );
-    println!("cargo:rustc-env=AUDIO_LOCAL_IP={}", config.audio.local_ip);
-    println!("cargo:rustc-env=AUDIO_REMOTE_IP={}", config.audio.remote_ip);
-    println!(
-        "cargo:rustc-env=AUDIO_BUFFER_SIZE={}",
-        config.audio.buffer_size
-    );
+    // 音频设备配置
     println!(
         "cargo:rustc-env=AUDIO_CAPTURE_DEVICE={}",
         config.audio.capture_device

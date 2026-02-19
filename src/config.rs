@@ -7,14 +7,7 @@ const CONFIG_FILE_NAME: &str = "xiaozhi_config.json";
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Config {
-    // 音频进程配置
-    pub audio_local_port: u16,
-    pub audio_remote_port: u16,
-    pub audio_local_ip: Cow<'static, str>,
-    pub audio_remote_ip: Cow<'static, str>,
-    pub audio_buffer_size: usize,
-
-    // 音频设备配置（内置音频库）
+    // 音频设备配置
     pub capture_device: Cow<'static, str>,
     pub playback_device: Cow<'static, str>,
 
@@ -61,19 +54,6 @@ impl Config {
     /// 所有参数都在编译时从 config.toml 中读取
     fn default_from_build() -> Result<Self, &'static str> {
         Ok(Self {
-            // 音频进程配置
-            audio_local_port: env!("AUDIO_LOCAL_PORT")
-                .parse()
-                .map_err(|_| "Failed to parse AUDIO_LOCAL_PORT")?,
-            audio_remote_port: env!("AUDIO_REMOTE_PORT")
-                .parse()
-                .map_err(|_| "Failed to parse AUDIO_REMOTE_PORT")?,
-            audio_local_ip: Cow::Borrowed(env!("AUDIO_LOCAL_IP")),
-            audio_remote_ip: Cow::Borrowed(env!("AUDIO_REMOTE_IP")),
-            audio_buffer_size: env!("AUDIO_BUFFER_SIZE")
-                .parse()
-                .map_err(|_| "Failed to parse AUDIO_BUFFER_SIZE")?,
-
             // 音频设备配置
             capture_device: Cow::Borrowed(env!("AUDIO_CAPTURE_DEVICE")),
             playback_device: Cow::Borrowed(env!("AUDIO_PLAYBACK_DEVICE")),

@@ -6,13 +6,8 @@ version = "1.0.0"
 type = "xiaozhi"
 name = "小智"
 
-# 音频进程配置
+# 音频设备配置
 [audio]
-local_port = 5676
-remote_port = 5677
-local_ip = "0.0.0.0"
-remote_ip = "127.0.0.1"
-buffer_size = 2048
 capture_device = "default"
 playback_device = "default"
 
