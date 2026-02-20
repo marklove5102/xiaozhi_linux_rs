@@ -22,7 +22,7 @@
 
 本项目建立在[虾哥 esp32 版小智](https://github.com/78/xiaozhi-esp32)和[百问网 Linux 版小智](https://github.com/100askTeam/xiaozhi-linux)的优良设计和宝贵经验之上，向他们致敬。
 
-
+QQ群：695113129
 
 ---
 

@@ -20,6 +20,8 @@ Not to ride the wave of "**Rewrite It In Rust**", but rather for personal intere
 
 This project builds upon the excellent design and valuable experience of [虾哥's Xiaozhi ESP32 version](https://github.com/78/xiaozhi-esp32) and [100askTeam's Xiaozhi Linux version](https://github.com/100askTeam/xiaozhi-linux). We pay tribute to their work.
 
+QQ Group：695113129
+
 ---
 
 ## System Architecture
