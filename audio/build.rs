@@ -1,5 +1,16 @@
 fn main() {
-    // Link libspeexdsp via pkg-config
+    let target = std::env::var("TARGET").unwrap_or_default();
+
+    if target.contains("musl") {
+        // musl 目标：使用手动编译的静态库，不依赖 pkg-config
+        if let Ok(sysroot) = std::env::var("MUSL_SYSROOT") {
+            println!("cargo:rustc-link-search=native={}/lib", sysroot);
+        }
+        println!("cargo:rustc-link-lib=static=speexdsp");
+        return;
+    }
+
+    // 其他目标：通过 pkg-config 查找 libspeexdsp
     pkg_config::Config::new()
         .probe("speexdsp")
         .expect("Failed to find speexdsp. Please install libspeexdsp-dev.");
