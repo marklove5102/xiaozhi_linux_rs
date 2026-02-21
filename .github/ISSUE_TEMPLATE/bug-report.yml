@@ -23,38 +23,28 @@ body:
       placeholder: e.g., Luckfox Pico, RV1106, Raspberry Pi
     validations:
       required: true
-  - type: dropdown
+  - type: input
     id: soundcard
     attributes:
       label: Sound Card Device
-      description: Is it an on-board codec or a USB sound card?
-      options:
-        - On-board (Internal Codec/I2S)
-        - USB Audio Device
-        - Other
+      description: "Specify your audio hardware. Options: On-board (Internal Codec/I2S), USB Audio Device, etc."
+      placeholder: e.g., On-board I2S
     validations:
       required: true
-  - type: dropdown
-    id: bug_type
+  - type: input
+    id: bug_category
     attributes:
       label: Bug Category
-      description: Select the nature of the issue.
-      options:
-        - Hardware Bug (e.g., abnormal sound playback, noise, peripheral failure)
-        - Software Logic Bug (e.g., authentication error, connection failure, crash)
+      description: "Describe the nature of the issue. Examples: Hardware Bug (abnormal sound, noise), Software Logic Bug (auth error, connection failure)."
+      placeholder: e.g., Software Logic Bug
     validations:
       required: true
-  - type: dropdown
+  - type: input
     id: rootfs
     attributes:
       label: Rootfs Environment
-      description: Select the root filesystem you are running.
-      options:
-        - Buildroot
-        - Busybox
-        - Armbian
-        - Ubuntu
-        - Custom (Please specify in steps)
+      description: "Specify your rootfs environment. Options: Buildroot, Busybox, Armbian, Ubuntu, or others."
+      placeholder: e.g., Buildroot
     validations:
       required: true
   - type: textarea
