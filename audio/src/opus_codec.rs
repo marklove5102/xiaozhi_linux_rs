@@ -194,11 +194,14 @@ impl OpusDecoder {
             self.decoder.decode(opus_data, &mut pcm_buf, false)?;
 
         // Step 2: Resample (input_rate → output_rate)
-        let target_frame_size =
-            (self.output_sample_rate * self.duration_ms / 1000) as usize;
+        // Dynamically size the output buffer based on actual decoded samples,
+        // not fixed duration_ms, to handle multi-frame Opus packets (e.g. 60ms).
+        let expected_out_samples = (decoded_samples_per_ch as f64
+            * (self.output_sample_rate as f64 / self.input_sample_rate as f64))
+            .ceil() as usize;
         // Allocate slightly larger to handle rounding
         let mut resampled =
-            vec![0i16; (target_frame_size + 64) * self.input_channels as usize];
+            vec![0i16; (expected_out_samples + 64) * self.input_channels as usize];
 
         let (in_consumed, out_produced) = self.resampler.process_int(
             0,

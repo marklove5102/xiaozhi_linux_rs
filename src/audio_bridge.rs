@@ -25,7 +25,7 @@ impl AudioBridge {
             opus_sample_rate: config.hello_sample_rate,
             opus_channels: config.hello_channels as u32,
             opus_bitrate: 64000,
-            encode_frame_duration_ms: 60,
+            encode_frame_duration_ms: 20,
             decode_frame_duration_ms: config.hello_frame_duration,
         };
 

@@ -305,18 +305,26 @@ fn play_thread(
                         if pcm_data.is_empty() {
                             continue;
                         }
-                        // Write decoded PCM to ALSA
-                        let frames = pcm_data.len() / actual_channels as usize;
-                        match io.writei(&pcm_data[..frames * actual_channels as usize]) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                log::warn!("ALSA playback error: {}, recovering...", e);
-                                if let Err(e2) = pcm.prepare() {
-                                    log::error!(
-                                        "Failed to recover PCM playback: {}",
-                                        e2
-                                    );
-                                    break;
+                        // Write decoded PCM to ALSA with retry loop to handle
+                        // short writes and XRUN recovery without losing frames.
+                        let total_frames = pcm_data.len() / actual_channels as usize;
+                        let mut frames_written = 0;
+                        while frames_written < total_frames {
+                            let offset = frames_written * actual_channels as usize;
+                            match io.writei(&pcm_data[offset..]) {
+                                Ok(n) => {
+                                    frames_written += n;
+                                }
+                                Err(e) => {
+                                    log::warn!("ALSA playback error: {}, recovering...", e);
+                                    if let Err(e2) = pcm.prepare() {
+                                        log::error!(
+                                            "Failed to recover PCM playback: {}",
+                                            e2
+                                        );
+                                        break;
+                                    }
+                                    // After recovery, the loop retries writing remaining frames
                                 }
                             }
                         }
