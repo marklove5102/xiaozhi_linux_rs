@@ -1,9 +1,6 @@
 #!/bin/bash
 # =============================================================================
 # 共用下载函数 —— 支持重试和 wget/curl 自动切换
-#
-# 用法：source scripts/download_helper.sh
-#       download_file <URL> <输出文件路径>
 # =============================================================================
 
 download_file() {
@@ -11,20 +8,19 @@ download_file() {
     local output="$2"
     local max_retries=3
     local retry_delay=5
+    local ua="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
 
     echo "下载: $url"
 
     for i in $(seq 1 $max_retries); do
-        # 优先使用 wget
         if command -v wget &>/dev/null; then
-            if wget --timeout=60 --tries=1 -q --show-progress -O "$output" "$url" 2>/dev/null; then
+            if wget --timeout=120 --tries=1 -U "$ua" -q --show-progress -O "$output" "$url"; then
                 return 0
             fi
         fi
 
-        # wget 不可用或失败时使用 curl
         if command -v curl &>/dev/null; then
-            if curl -fSL --connect-timeout 60 --retry 0 -o "$output" "$url" 2>/dev/null; then
+            if curl -fSL --connect-timeout 120 -A "$ua" --retry 0 -o "$output" "$url"; then
                 return 0
             fi
         fi

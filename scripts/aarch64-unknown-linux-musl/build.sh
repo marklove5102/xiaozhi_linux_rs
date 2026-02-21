@@ -49,7 +49,7 @@ if [ -x "$TOOLCHAIN_DIR/bin/${CROSS_PREFIX}-gcc" ]; then
 else
     echo "=== 下载 musl 交叉编译工具链 ==="
     TOOLCHAIN_TARBALL="${TOOLCHAIN_NAME}.tgz"
-    TOOLCHAIN_URL="https://musl.cc/${TOOLCHAIN_TARBALL}"
+    TOOLCHAIN_URL="https://github.com/Hyrsoft/xiaozhi_linux_rs/releases/download/Source_Mirror/${TOOLCHAIN_TARBALL}"
 
     echo "下载: $TOOLCHAIN_URL"
     download_file "$TOOLCHAIN_URL" "$TARGET_DIR/${TOOLCHAIN_TARBALL}"
@@ -107,7 +107,7 @@ if [ -f "$STATIC_LIBDIR/libasound.a" ]; then
     echo "alsa-lib 静态库已存在，跳过编译。"
 else
     ALSA_TARBALL="alsa-lib-${ALSA_VERSION}.tar.bz2"
-    ALSA_URL="https://www.alsa-project.org/files/pub/lib/${ALSA_TARBALL}"
+    ALSA_URL="https://github.com/Hyrsoft/xiaozhi_linux_rs/releases/download/Source_Mirror/${ALSA_TARBALL}"
 
     if [ ! -d "$ALSA_SRC_DIR" ]; then
         echo "下载 alsa-lib..."
@@ -146,7 +146,7 @@ if [ -f "$STATIC_LIBDIR/libopus.a" ]; then
     echo "opus 静态库已存在，跳过编译。"
 else
     OPUS_TARBALL="opus-${OPUS_VERSION}.tar.gz"
-    OPUS_URL="https://downloads.xiph.org/releases/opus/${OPUS_TARBALL}"
+    OPUS_URL="https://github.com/Hyrsoft/xiaozhi_linux_rs/releases/download/Source_Mirror/${OPUS_TARBALL}"
 
     if [ ! -d "$OPUS_SRC_DIR" ]; then
         echo "下载 opus..."
@@ -182,7 +182,7 @@ if [ -f "$STATIC_LIBDIR/libspeexdsp.a" ]; then
     echo "speexdsp 静态库已存在，跳过编译。"
 else
     SPEEXDSP_TARBALL="speexdsp-${SPEEXDSP_VERSION}.tar.gz"
-    SPEEXDSP_URL="https://downloads.xiph.org/releases/speex/${SPEEXDSP_TARBALL}"
+    SPEEXDSP_URL="https://github.com/Hyrsoft/xiaozhi_linux_rs/releases/download/Source_Mirror/${SPEEXDSP_TARBALL}"
 
     if [ ! -d "$SPEEXDSP_SRC_DIR" ]; then
         echo "下载 speexdsp..."
