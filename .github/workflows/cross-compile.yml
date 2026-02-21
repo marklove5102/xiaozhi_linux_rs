@@ -1,0 +1,124 @@
+name: Cross Compile (Musl Static)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: '编译目标'
+        required: true
+        type: choice
+        options:
+          - all
+          - armv7-unknown-linux-musleabihf
+          - aarch64-unknown-linux-musl
+        default: 'all'
+      version:
+        description: '版本标签 (例如: v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      release_body:
+        description: '版本更新说明 (Release Notes)'
+        required: false
+        type: string
+        default: |
+          ## 新功能
+          ## 部署注意事项
+          ## 开源协议与分发说明
+          本项目核心代码采用 MIT 协议开源。项目依赖的音频组件（ALSA 相关库）基于 LGPL 协议。
+          鉴于开源协议限制，本项目分发的静态链接二进制文件仅建议用于测试与评估。若您计划对本项目进行二次开发或商业分发，请务必遵循 LGPL 协议规范（例如：采用动态链接方式，或开源您的衍生作品）。开发者需自行承担因违反开源协议而产生的法律风险，本项目不承担任何连带责任。
+          
+
+jobs:
+  build-armv7:
+    if: ${{ github.event.inputs.target == 'all' || github.event.inputs.target == 'armv7-unknown-linux-musleabihf' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: armv7-unknown-linux-musleabihf
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y wget make pkg-config
+
+      - name: Cache toolchain & C libraries
+        uses: actions/cache@v4
+        with:
+          path: third_party/armv7-unknown-linux-musleabihf
+          key: musl-armv7-toolchain-v1
+
+      - name: Build (armv7-unknown-linux-musleabihf)
+        run: bash scripts/armv7-unknown-linux-musleabihf/build.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xiaozhi_linux_rs-armv7-musleabihf
+          path: target/armv7-unknown-linux-musleabihf/release/xiaozhi_linux_rs
+
+  build-aarch64:
+    if: ${{ github.event.inputs.target == 'all' || github.event.inputs.target == 'aarch64-unknown-linux-musl' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: aarch64-unknown-linux-musl
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y wget make pkg-config
+
+      - name: Cache toolchain & C libraries
+        uses: actions/cache@v4
+        with:
+          path: third_party/aarch64-unknown-linux-musl
+          key: musl-aarch64-toolchain-v1
+
+      - name: Build (aarch64-unknown-linux-musl)
+        run: bash scripts/aarch64-unknown-linux-musl/build.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xiaozhi_linux_rs-aarch64-musl
+          path: target/aarch64-unknown-linux-musl/release/xiaozhi_linux_rs
+
+  release:
+    if: ${{ always() && !cancelled() }}
+    needs: [build-armv7, build-aarch64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          if [ -f artifacts/xiaozhi_linux_rs-armv7-musleabihf/xiaozhi_linux_rs ]; then
+            cp artifacts/xiaozhi_linux_rs-armv7-musleabihf/xiaozhi_linux_rs release/xiaozhi_linux_rs-armv7-musleabihf
+            chmod +x release/xiaozhi_linux_rs-armv7-musleabihf
+          fi
+          if [ -f artifacts/xiaozhi_linux_rs-aarch64-musl/xiaozhi_linux_rs ]; then
+            cp artifacts/xiaozhi_linux_rs-aarch64-musl/xiaozhi_linux_rs release/xiaozhi_linux_rs-aarch64-musl
+            chmod +x release/xiaozhi_linux_rs-aarch64-musl
+          fi
+          ls -lh release/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: ${{ github.event.inputs.version }}
+          body: ${{ github.event.inputs.release_body }}
+          generate_release_notes: false
+          files: release/*
