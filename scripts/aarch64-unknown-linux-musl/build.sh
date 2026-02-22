@@ -71,8 +71,8 @@ echo "GCC version: $($CROSS_GCC --version | head -1)"
 
 # 静态库输出目录
 STATIC_SYSROOT="$TARGET_DIR/sysroot"
-STATIC_LIBDIR="$STATIC_SYSROOT/lib"
-STATIC_INCDIR="$STATIC_SYSROOT/include"
+STATIC_LIBDIR="$STATIC_SYSROOT/usr/lib"
+STATIC_INCDIR="$STATIC_SYSROOT/usr/include"
 
 # 源码下载与构建目录
 BUILD_DIR="$TARGET_DIR/build"
@@ -126,14 +126,14 @@ else
         --disable-python \
         --disable-alisp \
         --disable-old-symbols \
-        --with-configdir="$STATIC_SYSROOT/share/alsa" \
-        --with-plugindir="$STATIC_SYSROOT/lib/alsa-lib" \
-        --prefix="$STATIC_SYSROOT" \
+        --with-configdir="/usr/share/alsa" \
+        --with-plugindir="/usr/lib/alsa-lib" \
+        --prefix="/usr" \
         --quiet
 
     echo "编译 alsa-lib (使用 ${NPROC} 线程)..."
     make -j"$NPROC" --quiet
-    make install --quiet
+    make DESTDIR="$STATIC_SYSROOT" install --quiet
     echo "alsa-lib 编译完成!"
 fi
 
@@ -164,12 +164,12 @@ else
         --disable-shared \
         --disable-doc \
         --disable-extra-programs \
-        --prefix="$STATIC_SYSROOT" \
+        --prefix="/usr" \
         --quiet
 
     echo "编译 opus (使用 ${NPROC} 线程)..."
     make -j"$NPROC" --quiet
-    make install --quiet
+    make DESTDIR="$STATIC_SYSROOT" install --quiet
     echo "opus 编译完成!"
 fi
 
@@ -198,12 +198,12 @@ else
         --host="${CROSS_PREFIX}" \
         --enable-static \
         --disable-shared \
-        --prefix="$STATIC_SYSROOT" \
+        --prefix="/usr" \
         --quiet
 
     echo "编译 speexdsp (使用 ${NPROC} 线程)..."
     make -j"$NPROC" --quiet
-    make install --quiet
+    make DESTDIR="$STATIC_SYSROOT" install --quiet
     echo "speexdsp 编译完成!"
 fi
 

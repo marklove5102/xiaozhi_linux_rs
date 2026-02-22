@@ -4,7 +4,7 @@ fn main() {
     if target.contains("musl") {
         // musl 目标：使用手动编译的静态库，不依赖 pkg-config
         if let Ok(sysroot) = std::env::var("MUSL_SYSROOT") {
-            println!("cargo:rustc-link-search=native={}/lib", sysroot);
+            println!("cargo:rustc-link-search=native={}/usr/lib", sysroot);
         }
         println!("cargo:rustc-link-lib=static=speexdsp");
         return;

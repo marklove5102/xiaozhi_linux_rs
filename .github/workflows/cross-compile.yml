@@ -31,13 +31,13 @@ jobs:
           targets: armv7-unknown-linux-musleabihf
 
       - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y wget make pkg-config
+        run: sudo apt-get update && sudo apt-get install -y wget make pkg-config libasound2-dev
 
       - name: Cache toolchain & C libraries
         uses: actions/cache@v4
         with:
           path: third_party/armv7-unknown-linux-musleabihf
-          key: musl-armv7-toolchain-v1
+          key: musl-armv7-toolchain-v2
 
       - name: Build (armv7-unknown-linux-musleabihf)
         run: bash scripts/armv7-unknown-linux-musleabihf/build.sh
@@ -61,13 +61,13 @@ jobs:
           targets: aarch64-unknown-linux-musl
 
       - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y wget make pkg-config
+        run: sudo apt-get update && sudo apt-get install -y wget make pkg-config libasound2-dev
 
       - name: Cache toolchain & C libraries
         uses: actions/cache@v4
         with:
           path: third_party/aarch64-unknown-linux-musl
-          key: musl-aarch64-toolchain-v1
+          key: musl-aarch64-toolchain-v2
 
       - name: Build (aarch64-unknown-linux-musl)
         run: bash scripts/aarch64-unknown-linux-musl/build.sh

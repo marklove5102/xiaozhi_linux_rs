@@ -1,12 +1,6 @@
 ## 新特性
 
-- 基于 musl 的静态链接二进制分发，提供 armv7 和 aarch64 的
-- 修复已知音频 bug
-
-## 部署注意事项
-
-由于此版本采用完全静态链接（Musl），程序无法自动加载宿主系统的 ALSA 配置文件（`alsa.conf`），这会导致使用默认设备名时报错 `Unknown PCM default`。请参考[音频设备配置说明](https://github.com/Hyrsoft/xiaozhi_linux_rs/blob/main/docs/%E9%9F%B3%E9%A2%91%E8%AE%BE%E5%A4%87%E9%85%8D%E7%BD%AE%E8%AF%B4%E6%98%8E.md)进行配置，该问题待后期寻求解决方案。
-
+- 修复 musl 版本不能使用 default 音频设备的问题
 
 ## 开源协议与分发说明
 
