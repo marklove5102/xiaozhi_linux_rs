@@ -129,7 +129,6 @@ graph TD
   - `libopus-dev` / `opus-devel` (Opus 编解码库)  
   - `libspeexdsp-dev` / `speexdsp-devel` (SpeexDSP 处理库)
 
-  本项目依赖以上 C binding 库，**必须使用动态链接**，不支持完全静态编译（如 musl 目标）
 
 ### 已验证的目标设备（开发板）
 
@@ -145,7 +144,7 @@ graph TD
 
 其他目标平台的 Linux 设备（包括x86虚拟机）暂未进行验证，理论上都支持，具体交叉编译流程参考 [Rust Book](https://doc.rust-lang.org/beta/rustc/platform-support.html) 和 [RV1106 的编译脚本](./boards/rv1106_uclibceabihf/armv7_uclibc_build.sh)。
 
-暂不支持任何 musl 目标，因为不清楚如何静态链接依赖的音频相关 C 库 。后续可能支持。
+支持基于 musl 的完全静态链接，可从release中下载编译好的二进制，具体编译步骤参考 scripts 中的脚本。
 
 **欢迎进行测试和提交 Pull Request**（scripts 中的编译脚本和 README 的当前部分）
 
@@ -206,11 +205,20 @@ rustup component add rust-src --toolchain nightly
 
 ---
 
+## 开源协议与分发说明
+
+本项目核心代码采用 MIT 协议开源。项目依赖的音频组件（ALSA 相关库）基于 LGPL 协议。
+
+鉴于开源协议限制，本项目分发的静态链接二进制文件仅建议用于测试与评估。若您计划对本项目进行二次开发或商业分发，请务必遵循 LGPL 协议规范（例如：采用动态链接方式，或开源您的衍生作品）。开发者需自行承担因违反开源协议而产生的法律风险，本项目不承担任何连带责任。
+
+---
+
+
 
 
 ## 贡献
 
-如果你对嵌入式 Rust、Linux 网络编程感兴趣，欢迎提交 Issue 或 Pull Request！\
+如果你对嵌入式 Rust、Linux 网络编程感兴趣，欢迎提交 Issue 或 Pull Request！
 
 ---
 

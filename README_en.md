@@ -125,8 +125,6 @@ graph TD
   - `libopus-dev` / `opus-devel` (Opus codec library)
   - `libspeexdsp-dev` / `speexdsp-devel` (SpeexDSP processing library)
 
-  This project relies on the above C binding libraries and **must use dynamic linking**. Static compilation (such as musl targets) is not supported.
-
 ### Verified Target Devices (Development Boards)
 
 > Running this project requires the target device to have audio input and output capabilities.
@@ -141,7 +139,7 @@ graph TD
 
 Other Linux devices on different target platforms (including x86 virtual machines) have not been verified yet, but are theoretically supported. For specific cross-compilation procedures, refer to [Rust Book](https://doc.rust-lang.org/beta/rustc/platform-support.html) and [RV1106 build script](./boards/rv1106_uclibceabihf/armv7_uclibc_build.sh).
 
-musl targets are not currently supported, as it's unclear how to statically link the required audio-related C libraries. This may be supported in the future.
+Fully static linking based on musl is supported. Prebuilt binaries can be downloaded from Releases. For build steps, refer to the scripts in the scripts directory.
 
 **Testing and Pull Requests are welcome** (for build scripts in scripts and current sections of README).
 
@@ -199,6 +197,17 @@ rustup component add rust-src --toolchain nightly
 ```
 
 ---
+
+## Open Source License and Distribution Notice
+
+The core code of this project is open-sourced under the MIT License. The audio components that this project depends on (ALSA-related libraries) are subject to the LGPL License.
+
+Given the open source license restrictions, the statically linked binaries distributed by this project are recommended for testing and evaluation purposes only. If you plan to further develop or commercially distribute this project, please ensure compliance with the LGPL License (e.g., use dynamic linking, or open-source your derivative works). Developers bear full responsibility for any legal risks arising from violations of open source licenses; this project assumes no liability.
+
+---
+
+
+
 
 ## Contributing
 
