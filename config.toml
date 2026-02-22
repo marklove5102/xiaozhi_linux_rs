@@ -24,14 +24,6 @@ local_ip = "0.0.0.0"
 remote_ip = "127.0.0.1"
 buffer_size = 4096
 
-# IoT进程配置
-[iot]
-local_port = 5680
-remote_port = 5681
-local_ip = "0.0.0.0"
-remote_ip = "127.0.0.1"
-buffer_size = 4096
-
 # 网络配置
 [network]
 ws_url = "wss://api.tenclass.net/xiaozhi/v1/"
@@ -50,3 +42,15 @@ format = "opus"
 sample_rate = 24000
 channels = 1
 frame_duration = 20
+
+# MCP配置
+[mcp]
+enabled = true
+
+[[mcp.tools]]
+name = "get_system_status"
+description = "获取当前设备的系统状态，包括 CPU 负载、内存使用率、磁盘空间和运行时间。当用户询问系统压力、运行多久、负载情况时调用。"
+executable = "./test_tool.sh"
+[mcp.tools.input_schema]
+type = "object"
+[mcp.tools.input_schema.properties]

@@ -9,10 +9,10 @@ struct Config {
     board: Board,
     audio: Audio,
     gui: Gui,
-    iot: Iot,
     network: Network,
     hello_message: HelloMessage,
     features: Features,
+    mcp: serde_json::Value,
 }
 
 #[derive(Deserialize)]
@@ -40,15 +40,6 @@ struct Audio {
 
 #[derive(Deserialize)]
 struct Gui {
-    local_port: u16,
-    remote_port: u16,
-    local_ip: String,
-    remote_ip: String,
-    buffer_size: usize,
-}
-
-#[derive(Deserialize)]
-struct Iot {
     local_port: u16,
     remote_port: u16,
     local_ip: String,
@@ -129,13 +120,6 @@ fn main() {
     println!("cargo:rustc-env=GUI_REMOTE_IP={}", config.gui.remote_ip);
     println!("cargo:rustc-env=GUI_BUFFER_SIZE={}", config.gui.buffer_size);
 
-    // IoT config
-    println!("cargo:rustc-env=IOT_LOCAL_PORT={}", config.iot.local_port);
-    println!("cargo:rustc-env=IOT_REMOTE_PORT={}", config.iot.remote_port);
-    println!("cargo:rustc-env=IOT_LOCAL_IP={}", config.iot.local_ip);
-    println!("cargo:rustc-env=IOT_REMOTE_IP={}", config.iot.remote_ip);
-    println!("cargo:rustc-env=IOT_BUFFER_SIZE={}", config.iot.buffer_size);
-
     // 网络配置
     println!("cargo:rustc-env=WS_URL={}", config.network.ws_url);
     println!("cargo:rustc-env=OTA_URL={}", config.network.ota_url);
@@ -167,7 +151,10 @@ fn main() {
         config.features.enable_tts_display
     );
 
-    
+    // MCP配置
+    let mcp_json = serde_json::to_string(&config.mcp).expect("Failed to serialize mcp config");
+    println!("cargo:rustc-env=MCP_CONFIG_JSON={}", mcp_json);
+
     // 交叉编译配置
     let target = env::var("TARGET").unwrap_or_default();
     
@@ -182,5 +169,18 @@ fn main() {
         println!("cargo:rustc-link-arg=-Wl,--push-state,--whole-archive");
         println!("cargo:rustc-link-arg=-lauxval_stub");
         println!("cargo:rustc-link-arg=-Wl,--pop-state");
+    }
+
+    if target.contains("musl") {
+        // musl 目标：使用手动编译的静态库，不依赖 pkg-config
+        if let Ok(sysroot) = std::env::var("MUSL_SYSROOT") {
+            println!("cargo:rustc-link-search=native={}/usr/lib", sysroot);
+        }
+        println!("cargo:rustc-link-lib=static=speexdsp");
+    } else {
+        // 动态链接或其他目标：通过 pkg-config 查找 libspeexdsp
+        pkg_config::Config::new()
+            .probe("speexdsp")
+            .expect("Failed to find speexdsp. Please install libspeexdsp-dev.");
     }
 }

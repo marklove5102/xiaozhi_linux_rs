@@ -2,6 +2,7 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, fs, path::Path};
 use uuid::Uuid;
+use crate::mcp_gateway::ExternalToolConfig;
 
 const CONFIG_FILE_NAME: &str = "xiaozhi_config.json";
 
@@ -31,6 +32,13 @@ impl std::fmt::Display for AudioStreamFormat {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct McpConfig {
+    pub enabled: bool,
+    #[serde(default)]
+    pub tools: Vec<ExternalToolConfig>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Config {
     // 音频设备配置
     pub capture_device: Cow<'static, str>,
@@ -46,13 +54,6 @@ pub struct Config {
     pub gui_local_ip: Cow<'static, str>,
     pub gui_remote_ip: Cow<'static, str>,
     pub gui_buffer_size: usize,
-
-    // IoT进程配置
-    pub iot_local_port: u16,
-    pub iot_remote_port: u16,
-    pub iot_local_ip: Cow<'static, str>,
-    pub iot_remote_ip: Cow<'static, str>,
-    pub iot_buffer_size: usize,
 
     // 网络配置（静态部分）
     pub ws_url: Cow<'static, str>,
@@ -71,6 +72,9 @@ pub struct Config {
 
     // 功能开关
     pub enable_tts_display: bool,
+
+    // MCP配置
+    pub mcp: McpConfig,
 }
 
 impl Config {
@@ -118,19 +122,6 @@ impl Config {
                 .parse()
                 .map_err(|_| "Failed to parse GUI_BUFFER_SIZE")?,
 
-            // IoT进程配置
-            iot_local_port: env!("IOT_LOCAL_PORT")
-                .parse()
-                .map_err(|_| "Failed to parse IOT_LOCAL_PORT")?,
-            iot_remote_port: env!("IOT_REMOTE_PORT")
-                .parse()
-                .map_err(|_| "Failed to parse IOT_REMOTE_PORT")?,
-            iot_local_ip: Cow::Borrowed(env!("IOT_LOCAL_IP")),
-            iot_remote_ip: Cow::Borrowed(env!("IOT_REMOTE_IP")),
-            iot_buffer_size: env!("IOT_BUFFER_SIZE")
-                .parse()
-                .map_err(|_| "Failed to parse IOT_BUFFER_SIZE")?,
-
             // 网络配置
             ws_url: Cow::Borrowed(env!("WS_URL")),
             ota_url: Cow::Borrowed(env!("OTA_URL")),
@@ -156,6 +147,10 @@ impl Config {
             enable_tts_display: env!("ENABLE_TTS_DISPLAY")
                 .parse()
                 .map_err(|_| "Failed to parse ENABLE_TTS_DISPLAY")?,
+
+            // MCP配置
+            mcp: serde_json::from_str(env!("MCP_CONFIG_JSON"))
+                .map_err(|_| "Failed to parse MCP_CONFIG_JSON")?,
         })
     }
 
