@@ -9,13 +9,18 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../download_helper.sh"
 #
 # 本脚本会自动完成以下步骤：
 #   1. 下载 GNU 交叉编译工具链（如已存在则跳过）
-#   2. 下载并交叉编译 alsa-lib、opus、speexdsp 为静态库（.a）
-#   3. 将音频库静态链接进二进制，但保持 libc (GLIBC) 和 libdl 动态链接
+#   2. 下载并交叉编译 opus、speexdsp 为静态库（.a）
+#   3. ALSA 动态链接系统的 libasound.so，Opus/SpeexDSP 静态链接
 #
-# 混合链接策略优势：
-#   - 音频库静态打入，部署时无需拷贝 .so 文件
-#   - 动态链接 libc，支持 dlopen 加载板子上的 ALSA 插件（如 PulseAudio）
+# ALSA 动态链接策略优势：
+#   - 动态链接 libc + libasound，避免 GLIBC ABI 不匹配导致的 segfault
+#   - 支持 dlopen 加载板子上的 ALSA 插件（如 PulseAudio）
 #   - "default" 音频设备名可正常工作
+#   - Opus/SpeexDSP 静态打入，部署时无需额外拷贝 .so 文件
+#
+# 前置要求（CI 中自动安装）：
+#   sudo dpkg --add-architecture armhf
+#   sudo apt-get install libasound2-dev:armhf
 #
 # 无需手动安装任何工具链，适用于本地开发和 GitHub Actions CI。
 # =============================================================================
@@ -74,6 +79,10 @@ CROSS_STRIP="$TOOLCHAIN_DIR/bin/${CROSS_PREFIX}-strip"
 echo "CC: $CROSS_GCC"
 echo "GCC version: $($CROSS_GCC --version | head -1)"
 
+# GCC 工具链自带 GLIBC sysroot（位于 <toolchain>/arm-linux-gnueabihf/libc/），
+# 包含完整的 libpthread, libdl, libm, libc 等，无需额外下载。
+# GCC 会自动使用此内置 sysroot，不需要显式指定 --sysroot。
+
 # 静态库输出目录
 STATIC_SYSROOT="$TARGET_DIR/sysroot"
 STATIC_LIBDIR="$STATIC_SYSROOT/usr/lib"
@@ -91,7 +100,10 @@ SPEEXDSP_VERSION="1.2.1"
 NPROC=$(nproc 2>/dev/null || echo 4)
 
 # =============================================================================
-# 2. 下载并编译 C 依赖库（静态 .a）
+# 2. 下载并编译 C 依赖库
+#    - alsa-lib: 编译为共享库 (.so)，仅用于链接时符号解析
+#      运行时使用目标设备上的系统 libasound.so.2
+#    - opus, speexdsp: 编译为静态库 (.a)，直接打入二进制
 # =============================================================================
 
 mkdir -p "$STATIC_SYSROOT" "$STATIC_LIBDIR" "$STATIC_INCDIR" "$BUILD_DIR"
@@ -106,13 +118,14 @@ export STRIP="$CROSS_STRIP"
 export CFLAGS="-fPIC"
 export CXXFLAGS="-fPIC"
 
-# --- 2A. 编译 alsa-lib ---
+# --- 2A. 编译 alsa-lib（共享库，仅用于链接时符号解析）---
 echo ""
-echo "=== Step 2A: 编译 alsa-lib ${ALSA_VERSION} (静态) ==="
+echo "=== Step 2A: 编译 alsa-lib ${ALSA_VERSION} (共享库 .so，仅链接时使用) ==="
 
 ALSA_SRC_DIR="$BUILD_DIR/alsa-lib-${ALSA_VERSION}"
-if [ -f "$STATIC_LIBDIR/libasound.a" ]; then
-    echo "alsa-lib 静态库已存在，跳过编译。"
+ALSA_INSTALL_DIR="$TARGET_DIR/alsa-shared"
+if [ -f "$ALSA_INSTALL_DIR/usr/lib/libasound.so" ]; then
+    echo "alsa-lib 共享库已存在，跳过编译。"
 else
     ALSA_TARBALL="alsa-lib-${ALSA_VERSION}.tar.bz2"
     ALSA_URL="https://github.com/Hyrsoft/xiaozhi_linux_rs/releases/download/Source_Mirror/${ALSA_TARBALL}"
@@ -126,24 +139,41 @@ else
     fi
 
     cd "$ALSA_SRC_DIR"
-    echo "配置 alsa-lib..."
+    # 清理之前可能存在的静态编译产物
+    make distclean 2>/dev/null || true
+    echo "配置 alsa-lib (共享库模式)..."
+    # LDFLAGS="-Wl,--as-needed": 仅为 libasound.so 实际使用符号的库添加 DT_NEEDED
+    # 避免 libpthread.so.0 等作为间接依赖被加载，导致旧版 ld 的 --as-needed 冲突
     ./configure \
         --host="${CROSS_PREFIX}" \
-        --enable-static \
-        --disable-shared \
+        --enable-shared \
+        --disable-static \
         --disable-python \
         --disable-alisp \
         --disable-old-symbols \
+        --disable-topology \
         --with-configdir="/usr/share/alsa" \
         --with-plugindir="/usr/lib/alsa-lib" \
         --prefix="/usr" \
+        LDFLAGS="-Wl,--as-needed" \
         --quiet
 
     echo "编译 alsa-lib (使用 ${NPROC} 线程)..."
     make -j"$NPROC" --quiet
-    make DESTDIR="$STATIC_SYSROOT" install --quiet
-    echo "alsa-lib 编译完成!"
+    mkdir -p "$ALSA_INSTALL_DIR"
+    make DESTDIR="$ALSA_INSTALL_DIR" install --quiet
+
+    # 修正 alsa.pc 中的 prefix 路径：/usr → 实际安装绝对路径
+    # 否则 pkg-config 会返回 -L/usr/lib，指向宿主机的 x86_64 库
+    sed -i "s|prefix=/usr|prefix=$ALSA_INSTALL_DIR/usr|" "$ALSA_INSTALL_DIR/usr/lib/pkgconfig/alsa.pc"
+
+    echo "alsa-lib 共享库编译完成!"
 fi
+
+ALSA_SHARED_LIBDIR="$ALSA_INSTALL_DIR/usr/lib"
+ALSA_SHARED_PKGCONFIG="$ALSA_INSTALL_DIR/usr/lib/pkgconfig"
+echo "ALSA 共享库: $ALSA_SHARED_LIBDIR"
+ls -la "$ALSA_SHARED_LIBDIR"/libasound.so* 2>/dev/null || true
 
 # --- 2B. 编译 Opus ---
 echo ""
@@ -178,6 +208,10 @@ else
     echo "编译 opus (使用 ${NPROC} 线程)..."
     make -j"$NPROC" --quiet
     make DESTDIR="$STATIC_SYSROOT" install --quiet
+    
+    # 修正 opus.pc 中的宿主机绝对路径
+    sed -i "s|prefix=/usr|prefix=$STATIC_SYSROOT/usr|" "$STATIC_SYSROOT/usr/lib/pkgconfig/opus.pc"
+    
     echo "opus 编译完成!"
 fi
 
@@ -212,6 +246,10 @@ else
     echo "编译 speexdsp (使用 ${NPROC} 线程)..."
     make -j"$NPROC" --quiet
     make DESTDIR="$STATIC_SYSROOT" install --quiet
+    
+    # 修正 speexdsp.pc 中的宿主机绝对路径
+    sed -i "s|prefix=/usr|prefix=$STATIC_SYSROOT/usr|" "$STATIC_SYSROOT/usr/lib/pkgconfig/speexdsp.pc"
+    
     echo "speexdsp 编译完成!"
 fi
 
@@ -244,25 +282,25 @@ export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER="$CROSS_GCC"
 export CFLAGS_armv7_unknown_linux_gnueabihf="-fPIC"
 
 # 混合链接：不使用 +crt-static，保持 libc/libdl 动态链接
-# 通过 -L 指向静态库目录，并显式链接 dl/pthread/m
-export RUSTFLAGS="-C link-arg=-L$STATIC_LIBDIR -C link-arg=-ldl -C link-arg=-lpthread -C link-arg=-lm"
+# GCC 自带 sysroot 提供 libpthread/libdl/libm/libc 等系统库，无需 --sysroot
+# -L 指向：静态库目录（opus/speexdsp）和 ALSA 共享库目录
+# --no-as-needed：确保 -lpthread -ldl -lm 不会被 Rust 注入的 --as-needed 丢弃
+export RUSTFLAGS="-C link-arg=-L$STATIC_LIBDIR -C link-arg=-L$ALSA_SHARED_LIBDIR -C link-arg=-Wl,--no-as-needed -C link-arg=-ldl -C link-arg=-lpthread -C link-arg=-lm"
 
 # 告诉 audiopus_sys 使用静态链接 opus
 export LIBOPUS_STATIC=1
 
-# 告诉 alsa-sys 使用静态链接 alsa
-export ALSA_STATIC=1
+# ALSA 动态链接：
+#   - 不设置 ALSA_STATIC，让 alsa-sys 动态链接 libasound.so
+#   - alsa.pc 已通过 sed 修正为实际安装路径，pkg-config 返回正确的 -L 路径
+#   - 运行时由目标设备的系统 libasound.so.2 提供
 
-# pkg-config 配置 —— 指向我们编译出的静态库
+# pkg-config 配置
 export PKG_CONFIG_ALLOW_CROSS=1
-export PKG_CONFIG_PATH=""
-export PKG_CONFIG_LIBDIR="$STATIC_LIBDIR/pkgconfig"
-export PKG_CONFIG_SYSROOT_DIR="$STATIC_SYSROOT"
-# 强制 pkg-config 只报告静态链接标志
-export PKG_CONFIG_ALL_STATIC=1
-
-# 传递静态 sysroot 路径给 audio/build.rs
-export STATIC_AUDIO_SYSROOT="$STATIC_SYSROOT"
+# 使用 PKG_CONFIG_LIBDIR（而非 PKG_CONFIG_PATH）完全替换系统默认搜索路径，
+# 避免 pkg-config 泄漏宿主机的 /usr/lib（x86_64）到交叉编译的链接参数中
+export PKG_CONFIG_LIBDIR="$STATIC_LIBDIR/pkgconfig:$ALSA_SHARED_PKGCONFIG"
+export PKG_CONFIG_SYSROOT_DIR=""
 
 echo "CC:           $CROSS_GCC"
 echo "STATIC_LIBS:  $STATIC_SYSROOT"
@@ -273,7 +311,7 @@ echo "RUSTFLAGS:    $RUSTFLAGS"
 # =============================================================================
 
 echo ""
-echo "=== Step 4: 编译 Rust 项目 (混合链接: 音频库静态 + libc 动态) ==="
+echo "=== Step 4: 编译 Rust 项目 (ALSA 动态 + Opus/SpeexDSP 静态) ==="
 echo "Building in: $PROJECT_ROOT"
 echo "Target: $TARGET"
 
@@ -299,7 +337,8 @@ if [ -f "$OUTPUT_BIN" ]; then
     echo "  （应显示 'dynamically linked'，表示 libc 动态链接）"
     echo ""
     echo "  readelf -d $OUTPUT_BIN | grep NEEDED"
-    echo "  （应仅显示 libc/libdl/libpthread 等系统库，不应出现 libasound/libopus/libspeexdsp）"
+    echo "  （应包含 libasound.so.2、libc.so.6 等系统库）"
+    echo "  （不应出现 libopus/libspeexdsp，它们已静态链接）"
 else
     echo "警告: 未找到输出文件 $OUTPUT_BIN"
     echo "请检查编译日志。"
