@@ -5,7 +5,7 @@ set -e
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../download_helper.sh"
 
 # =============================================================================
-# aarch64-unknown-linux-gnu 混合链接编译脚本
+# armv7-unknown-linux-gnueabihf 混合链接编译脚本
 #
 # 本脚本会自动完成以下步骤：
 #   1. 下载 GNU 交叉编译工具链（如已存在则跳过）
@@ -29,7 +29,7 @@ cd "$PROJECT_ROOT"
 PROJECT_ROOT="$(pwd)"
 
 echo "============================================="
-echo "  混合链接编译 - aarch64-unknown-linux-gnu"
+echo "  混合链接编译 - armv7-unknown-linux-gnueabihf"
 echo "============================================="
 echo "Project root: $PROJECT_ROOT"
 
@@ -37,8 +37,8 @@ echo "Project root: $PROJECT_ROOT"
 # 1. 基础配置
 # =============================================================================
 
-TARGET="aarch64-unknown-linux-gnu"
-CROSS_PREFIX="aarch64-linux-gnu"
+TARGET="armv7-unknown-linux-gnueabihf"
+CROSS_PREFIX="arm-linux-gnueabihf"
 
 # 所有第三方内容统一放在 third_party/<target> 下，避免多目标冲突
 THIRD_PARTY="$PROJECT_ROOT/third_party"
@@ -46,7 +46,7 @@ TARGET_DIR="$THIRD_PARTY/$TARGET"
 mkdir -p "$TARGET_DIR"
 
 # --- 1A. 下载 GNU 交叉编译工具链 ---
-TOOLCHAIN_NAME="gcc-arm-8.3-2019.02-x86_64-aarch64-linux-gnu"
+TOOLCHAIN_NAME="gcc-arm-8.3-2019.02-x86_64-arm-linux-gnueabihf"
 TOOLCHAIN_DIR="$TARGET_DIR/$TOOLCHAIN_NAME"
 
 if [ -x "$TOOLCHAIN_DIR/bin/${CROSS_PREFIX}-gcc" ]; then
@@ -233,15 +233,15 @@ echo "=== Step 3: 设置 Rust 编译环境 ==="
 rustup target add "$TARGET" 2>/dev/null || true
 
 # CC / CXX 环境变量（Cargo 使用下划线格式的目标三元组）
-export CC_aarch64_unknown_linux_gnu="$CROSS_GCC"
-export CXX_aarch64_unknown_linux_gnu="$CROSS_CXX"
-export AR_aarch64_unknown_linux_gnu="$CROSS_AR"
+export CC_armv7_unknown_linux_gnueabihf="$CROSS_GCC"
+export CXX_armv7_unknown_linux_gnueabihf="$CROSS_CXX"
+export AR_armv7_unknown_linux_gnueabihf="$CROSS_AR"
 
 # Cargo linker
-export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER="$CROSS_GCC"
+export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER="$CROSS_GCC"
 
 # 告诉 Rust cc crate 编译 C 源码时使用 -fPIC（PIE 二进制必需）
-export CFLAGS_aarch64_unknown_linux_gnu="-fPIC"
+export CFLAGS_armv7_unknown_linux_gnueabihf="-fPIC"
 
 # 混合链接：不使用 +crt-static，保持 libc/libdl 动态链接
 # 通过 -L 指向静态库目录，并显式链接 dl/pthread/m

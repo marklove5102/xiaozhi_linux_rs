@@ -1,4 +1,4 @@
-## aarch64-unknown-linux-gnu 交叉编译说明
+## armv7-unknown-linux-gnueabihf 交叉编译说明
 
 ### 混合链接策略
 
@@ -18,23 +18,23 @@
 
 ```bash
 # 直接运行
-bash scripts/aarch64-unknown-linux-gnu/build.sh
+bash scripts/armv7-unknown-linux-gnueabihf/build.sh
 
-# 输出: target/aarch64-unknown-linux-gnu/release/xiaozhi_linux_rs
+# 输出: target/armv7-unknown-linux-gnueabihf/release/xiaozhi_linux_rs
 ```
 
 ### 工具链说明
 
-脚本从 `Source_Mirror` Release 下载 `aarch64-linux-gnu-cross` 工具链。如需替换为其他版本的 GNU 工具链（例如使用更低版本的 GLIBC 以提升设备兼容性），修改脚本中的 `TOOLCHAIN_URL` 即可。
+脚本使用 ARM 官方 GCC 8.3 工具链（`gcc-arm-8.3-2019.02-x86_64-arm-linux-gnueabihf`）。
 
-> **GLIBC 版本兼容性**：编译时工具链的 GLIBC 版本决定了二进制能运行的最低系统版本。使用 GLIBC 2.17 (CentOS 7) 或 2.27 (Ubuntu 18.04) 的工具链可获得最广泛的兼容性。
+> **GLIBC 版本兼容性**：编译时工具链的 GLIBC 版本决定了二进制能运行的最低系统版本。GCC 8.3 工具链提供较低的 GLIBC 版本，兼容性较好。
 
 ### 验证构建结果
 
 ```bash
 # 应显示 'dynamically linked'
-file target/aarch64-unknown-linux-gnu/release/xiaozhi_linux_rs
+file target/armv7-unknown-linux-gnueabihf/release/xiaozhi_linux_rs
 
 # NEEDED 中应仅出现 libc/libdl/libpthread，不应出现 libasound/libopus/libspeexdsp
-readelf -d target/aarch64-unknown-linux-gnu/release/xiaozhi_linux_rs | grep NEEDED
+readelf -d target/armv7-unknown-linux-gnueabihf/release/xiaozhi_linux_rs | grep NEEDED
 ```

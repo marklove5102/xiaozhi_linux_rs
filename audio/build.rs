@@ -10,6 +10,13 @@ fn main() {
         return;
     }
 
+    // GNU 混合链接：音频库静态链接，libc 动态链接
+    if let Ok(sysroot) = std::env::var("STATIC_AUDIO_SYSROOT") {
+        println!("cargo:rustc-link-search=native={}/usr/lib", sysroot);
+        println!("cargo:rustc-link-lib=static=speexdsp");
+        return;
+    }
+
     // 其他目标：通过 pkg-config 查找 libspeexdsp
     pkg_config::Config::new()
         .probe("speexdsp")
