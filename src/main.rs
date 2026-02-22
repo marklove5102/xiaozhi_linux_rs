@@ -59,7 +59,9 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // 初始化 MCP Gateway 工具箱
-    let mcp_tools_path = std::path::Path::new("mcp_tools.json");
+    let exe_path = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let exe_dir = exe_path.parent().unwrap_or(std::path::Path::new("."));
+    let mcp_tools_path = exe_dir.join("mcp_tools.json");
     let mut mcp_configs = vec![];
 
     if !mcp_tools_path.exists() {
@@ -68,7 +70,7 @@ async fn main() -> anyhow::Result<()> {
           {
             "name": "linux.execute_bash",
             "description": "Execute a safe bash command to get system status (default tool)",
-            "executable": "./scripts/test_tool.sh",
+            "executable": "./test_tool.sh",
             "input_schema": {
               "type": "object",
               "properties": {
@@ -79,7 +81,7 @@ async fn main() -> anyhow::Result<()> {
           }
         ]);
         if let Ok(json_str) = serde_json::to_string_pretty(&default_config) {
-            if let Err(e) = std::fs::write(mcp_tools_path, json_str) {
+            if let Err(e) = std::fs::write(&mcp_tools_path, json_str) {
                 eprintln!("Warning: Failed to create default mcp_tools.json: {}", e);
             } else {
                 println!("Created default mcp_tools.json");

@@ -2,8 +2,7 @@
 # test_tool.sh - Test script for MCP Gateway
 # Reads JSON from stdin, extracts the "command" field, and executes it.
 
-cd /home/hao/projects/xiaozhi_linux_rs
-
+# (removed hardcoded cd command to make it generic)
 # Read from stdin
 INPUT=$(cat)
 
