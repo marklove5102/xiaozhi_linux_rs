@@ -13,6 +13,7 @@ struct Config {
     network: Network,
     hello_message: HelloMessage,
     features: Features,
+    mcp: serde_json::Value,
 }
 
 #[derive(Deserialize)]
@@ -167,7 +168,10 @@ fn main() {
         config.features.enable_tts_display
     );
 
-    
+    // MCP配置
+    let mcp_json = serde_json::to_string(&config.mcp).expect("Failed to serialize mcp config");
+    println!("cargo:rustc-env=MCP_CONFIG_JSON={}", mcp_json);
+
     // 交叉编译配置
     let target = env::var("TARGET").unwrap_or_default();
     

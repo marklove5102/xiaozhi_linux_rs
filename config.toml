@@ -50,3 +50,18 @@ format = "opus"
 sample_rate = 24000
 channels = 1
 frame_duration = 20
+
+# MCP配置
+[mcp]
+enabled = true
+
+[[mcp.tools]]
+name = "linux.execute_bash"
+description = "Execute a safe bash command to get system status (default tool)"
+executable = "./test_tool.sh"
+[mcp.tools.input_schema]
+type = "object"
+required = ["command"]
+[mcp.tools.input_schema.properties.command]
+type = "string"
+description = "The shell command to execute, e.g. 'free -h' or 'uptime'"

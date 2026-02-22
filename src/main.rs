@@ -21,7 +21,7 @@ use std::sync::Arc;
 use tokio::signal;
 use tokio::sync::mpsc;
 use uuid::Uuid;
-use crate::mcp_gateway::{init_mcp_gateway, ExternalToolConfig};
+use crate::mcp_gateway::init_mcp_gateway;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -60,46 +60,13 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // 初始化 MCP Gateway 工具箱
-    let exe_path = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("."));
-    let exe_dir = exe_path.parent().unwrap_or(std::path::Path::new("."));
-    let mcp_tools_path = exe_dir.join("mcp_tools.json");
-    let mut mcp_configs = vec![];
-
-    if !mcp_tools_path.exists() {
-        // 如果不存在，生成一个默认模板
-        let default_config = serde_json::json!([
-          {
-            "name": "linux.execute_bash",
-            "description": "Execute a safe bash command to get system status (default tool)",
-            "executable": "./test_tool.sh",
-            "input_schema": {
-              "type": "object",
-              "properties": {
-                "command": { "type": "string", "description": "The shell command to execute, e.g. 'free -h' or 'uptime'" }
-              },
-              "required": ["command"]
-            }
-          }
-        ]);
-        if let Ok(json_str) = serde_json::to_string_pretty(&default_config) {
-            if let Err(e) = std::fs::write(&mcp_tools_path, json_str) {
-                eprintln!("Warning: Failed to create default mcp_tools.json: {}", e);
-            } else {
-                println!("Created default mcp_tools.json");
-            }
-        }
-    }
-
-    if mcp_tools_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(mcp_tools_path) {
-            if let Ok(configs) = serde_json::from_str::<Vec<ExternalToolConfig>>(&content) {
-                mcp_configs = configs;
-                println!("Loaded {} external MCP tools from mcp_tools.json", mcp_configs.len());
-            } else {
-                eprintln!("Warning: Failed to parse mcp_tools.json, using no external tools");
-            }
-        }
-    }
+    let mcp_configs = if config.mcp.enabled {
+        println!("MCP Gateway is enabled. Loaded {} tools from configuration.", config.mcp.tools.len());
+        config.mcp.tools.clone()
+    } else {
+        println!("MCP Gateway is disabled.");
+        vec![]
+    };
     let mcp_server = Arc::new(init_mcp_gateway(mcp_configs));
 
     // 创建通道，用于组件间通信

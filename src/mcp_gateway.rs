@@ -44,7 +44,7 @@ pub trait McpTool: Send + Sync {
 // 3. Subprocess External Tool
 // ==========================================
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ExternalToolConfig {
     pub name: String,
     pub description: String,

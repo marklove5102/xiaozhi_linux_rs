@@ -2,6 +2,7 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, fs, path::Path};
 use uuid::Uuid;
+use crate::mcp_gateway::ExternalToolConfig;
 
 const CONFIG_FILE_NAME: &str = "xiaozhi_config.json";
 
@@ -28,6 +29,13 @@ impl std::fmt::Display for AudioStreamFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
     }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct McpConfig {
+    pub enabled: bool,
+    #[serde(default)]
+    pub tools: Vec<ExternalToolConfig>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -71,6 +79,9 @@ pub struct Config {
 
     // 功能开关
     pub enable_tts_display: bool,
+
+    // MCP配置
+    pub mcp: McpConfig,
 }
 
 impl Config {
@@ -156,6 +167,10 @@ impl Config {
             enable_tts_display: env!("ENABLE_TTS_DISPLAY")
                 .parse()
                 .map_err(|_| "Failed to parse ENABLE_TTS_DISPLAY")?,
+
+            // MCP配置
+            mcp: serde_json::from_str(env!("MCP_CONFIG_JSON"))
+                .map_err(|_| "Failed to parse MCP_CONFIG_JSON")?,
         })
     }
 
