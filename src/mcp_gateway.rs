@@ -3,7 +3,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::process::Stdio;
+use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
+use tokio::sync::mpsc;
+use tokio::time::{timeout, Duration};
 
 // ==========================================
 // 1. Protocol Definitions
@@ -29,7 +32,84 @@ pub struct JsonRpcResponse {
 }
 
 // ==========================================
-// 2. Tool Trait definition
+// 2. Configuration Types
+// ==========================================
+
+/// 执行模式 —— 对话语义层面的同步/异步
+/// - Sync（默认）：等待执行完成，结果返回给大模型（对话级同步）
+/// - Background：立刻返回，后台执行，完成后通过状态机通知队列告知用户（对话级异步）
+#[derive(Clone, Debug, Deserialize, Serialize, Default, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum ExecutionMode {
+    #[default]
+    Sync,
+    Background,
+}
+
+/// 传输协议类型
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum ToolTransport {
+    /// 子进程 stdin/stdout 模式
+    Subprocess {
+        executable: String,
+        #[serde(default)]
+        args: Vec<String>,
+    },
+    /// HTTP/REST 调用
+    Http {
+        url: String,
+        #[serde(default = "default_http_method")]
+        method: String,
+    },
+    /// TCP Socket JSON 通信
+    Tcp {
+        address: String,
+    },
+}
+
+fn default_http_method() -> String {
+    "POST".to_string()
+}
+
+fn default_timeout() -> u64 {
+    5000
+}
+
+/// 统一的工具配置
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ExternalToolConfig {
+    pub name: String,
+    pub description: String,
+    pub input_schema: Value,
+
+    /// 对话语义层面的执行模式，默认为 sync
+    #[serde(default)]
+    pub mode: ExecutionMode,
+
+    /// 统一超时时间（毫秒），默认 5000ms
+    #[serde(default = "default_timeout")]
+    pub timeout_ms: u64,
+
+    /// 传输协议配置（扁平化到同一层 JSON/TOML）
+    #[serde(flatten)]
+    pub transport: ToolTransport,
+}
+
+// ==========================================
+// 3. Background Task Notification
+// ==========================================
+
+/// 后台任务完成后发送给 CoreController 的通知
+#[derive(Debug)]
+pub struct BackgroundTaskResult {
+    pub tool_name: String,
+    pub success: bool,
+    pub message: String,
+}
+
+// ==========================================
+// 4. Tool Trait
 // ==========================================
 
 #[async_trait]
@@ -41,23 +121,121 @@ pub trait McpTool: Send + Sync {
 }
 
 // ==========================================
-// 3. Subprocess External Tool
+// 5. DynamicTool — 多传输协议 + 多执行模式
 // ==========================================
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ExternalToolConfig {
-    pub name: String,
-    pub description: String,
-    pub executable: String,
-    pub input_schema: Value,
+pub struct DynamicTool {
+    config: ExternalToolConfig,
+    bg_tx: mpsc::Sender<BackgroundTaskResult>,
 }
 
-pub struct ExternalTool {
-    config: ExternalToolConfig,
+impl DynamicTool {
+    pub fn new(config: ExternalToolConfig, bg_tx: mpsc::Sender<BackgroundTaskResult>) -> Self {
+        Self { config, bg_tx }
+    }
+
+    /// 根据传输协议类型分发执行（纯异步非阻塞）
+    async fn execute_inner(config: &ExternalToolConfig, params: Value) -> Result<Value, String> {
+        match &config.transport {
+            ToolTransport::Subprocess { executable, args } => {
+                Self::exec_subprocess(executable, args, params).await
+            }
+            ToolTransport::Http { url, method } => {
+                Self::exec_http(url, method, params).await
+            }
+            ToolTransport::Tcp { address } => {
+                Self::exec_tcp(address, params).await
+            }
+        }
+    }
+
+    /// 子进程执行（tokio::process，异步非阻塞）
+    async fn exec_subprocess(
+        executable: &str,
+        args: &[String],
+        params: Value,
+    ) -> Result<Value, String> {
+        let args_json = serde_json::to_string(&params).unwrap_or_default();
+        log::info!("Executing subprocess tool: {}, args: {}", executable, args_json);
+
+        let mut child = Command::new(executable)
+            .args(args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("Failed to spawn {}: {}", executable, e))?;
+
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin.write_all(args_json.as_bytes()).await.unwrap_or_default();
+        }
+
+        let output = child
+            .wait_with_output()
+            .await
+            .map_err(|e| format!("Failed to wait for {}: {}", executable, e))?;
+
+        if output.status.success() {
+            let result_str = String::from_utf8_lossy(&output.stdout).to_string();
+            Ok(json!(result_str))
+        } else {
+            let err_str = String::from_utf8_lossy(&output.stderr).to_string();
+            Err(format!("Subprocess error: {}", err_str))
+        }
+    }
+
+    /// HTTP 调用（reqwest 异步非阻塞）
+    async fn exec_http(url: &str, method: &str, params: Value) -> Result<Value, String> {
+        let client = reqwest::Client::new();
+
+        let request = match method.to_uppercase().as_str() {
+            "GET" => client.get(url),
+            _ => client.post(url).json(&params),
+        };
+
+        let response = request
+            .send()
+            .await
+            .map_err(|e| format!("HTTP request failed: {}", e))?;
+
+        let text = response
+            .text()
+            .await
+            .map_err(|e| format!("Failed to read HTTP response: {}", e))?;
+
+        Ok(json!(text))
+    }
+
+    /// TCP Socket 调用（tokio::net，异步非阻塞）
+    async fn exec_tcp(address: &str, params: Value) -> Result<Value, String> {
+        use tokio::io::AsyncReadExt;
+        use tokio::net::TcpStream;
+
+        let mut stream = TcpStream::connect(address)
+            .await
+            .map_err(|e| format!("TCP connection to {} failed: {}", address, e))?;
+
+        let mut payload = serde_json::to_vec(&params).unwrap_or_default();
+        payload.push(b'\n');
+
+        stream
+            .write_all(&payload)
+            .await
+            .map_err(|e| format!("TCP write failed: {}", e))?;
+
+        let mut buf = vec![0u8; 4096];
+        let n = stream
+            .read(&mut buf)
+            .await
+            .map_err(|e| format!("TCP read failed: {}", e))?;
+
+        let result_str = String::from_utf8_lossy(&buf[..n]).to_string();
+        Ok(json!(result_str))
+    }
 }
 
 #[async_trait]
-impl McpTool for ExternalTool {
+impl McpTool for DynamicTool {
     fn name(&self) -> &str {
         &self.config.name
     }
@@ -71,37 +249,71 @@ impl McpTool for ExternalTool {
     }
 
     async fn call(&self, params: Value) -> Result<Value, String> {
-        let args_json = serde_json::to_string(&params).unwrap_or_default();
-        log::info!("Executing external tool: {}, args: {}", self.config.executable, args_json);
+        // ---- 后台模式（对话级异步）：立刻返回，后台执行，完成后通知 CoreController ----
+        if self.config.mode == ExecutionMode::Background {
+            let config_clone = self.config.clone();
+            let bg_tx = self.bg_tx.clone();
+            let timeout_ms = self.config.timeout_ms;
 
-        let mut child = Command::new(&self.config.executable)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("Failed to spawn external program {}: {}", self.config.executable, e))?;
+            tokio::spawn(async move {
+                log::info!("后台任务已启动: {}", config_clone.name);
+                let timeout_duration = Duration::from_millis(timeout_ms);
 
-        if let Some(mut stdin) = child.stdin.take() {
-            use tokio::io::AsyncWriteExt;
-            stdin.write_all(args_json.as_bytes()).await.unwrap_or_default();
+                let result = match timeout(
+                    timeout_duration,
+                    Self::execute_inner(&config_clone, params),
+                )
+                .await
+                {
+                    Ok(Ok(value)) => BackgroundTaskResult {
+                        tool_name: config_clone.name.clone(),
+                        success: true,
+                        message: value
+                            .as_str()
+                            .unwrap_or(&value.to_string())
+                            .to_string(),
+                    },
+                    Ok(Err(err)) => BackgroundTaskResult {
+                        tool_name: config_clone.name.clone(),
+                        success: false,
+                        message: err,
+                    },
+                    Err(_) => BackgroundTaskResult {
+                        tool_name: config_clone.name.clone(),
+                        success: false,
+                        message: format!("后台任务超时 ({}ms)", timeout_ms),
+                    },
+                };
+
+                if let Err(e) = bg_tx.send(result).await {
+                    log::error!("Failed to send background task result: {}", e);
+                }
+            });
+
+            // 立刻返回，不阻塞大模型对话
+            return Ok(json!({
+                "status": "started",
+                "message": format!("任务 '{}' 已在后台启动，完成后会通知您。", self.config.name)
+            }));
         }
 
-        let output = child.wait_with_output().await
-            .map_err(|e| format!("Failed to wait for external program: {}", e))?;
+        // ---- 标准同步模式（对话级同步）：等待执行完成，结果返回给大模型 ----
+        let timeout_duration = Duration::from_millis(self.config.timeout_ms);
+        let config = &self.config;
 
-        if output.status.success() {
-            let result_str = String::from_utf8_lossy(&output.stdout).to_string();
-            // Return raw string output. We can map it to proper JSON array format for MCP later.
-            Ok(json!(result_str))
-        } else {
-            let err_str = String::from_utf8_lossy(&output.stderr).to_string();
-            Err(format!("External program error: {}", err_str))
+        match timeout(timeout_duration, Self::execute_inner(config, params)).await {
+            Ok(Ok(result)) => Ok(result),
+            Ok(Err(err)) => Err(err),
+            Err(_) => Err(format!(
+                "Tool '{}' execution timed out after {} ms",
+                self.config.name, self.config.timeout_ms
+            )),
         }
     }
 }
 
 // ==========================================
-// 4. MCP Server router
+// 6. MCP Server Router
 // ==========================================
 
 pub struct McpServer {
@@ -199,14 +411,19 @@ impl McpServer {
 }
 
 // ==========================================
-// 5. Setup helper
+// 7. Setup helper
 // ==========================================
 
-pub fn init_mcp_gateway(configs: Vec<ExternalToolConfig>) -> McpServer {
+pub fn init_mcp_gateway(
+    configs: Vec<ExternalToolConfig>,
+    bg_tx: mpsc::Sender<BackgroundTaskResult>,
+) -> McpServer {
     let mut server = McpServer::new();
     for config in configs {
-        let external_tool = ExternalTool { config };
-        server.register_tool(Box::new(external_tool));
+        let tool_name = config.name.clone();
+        let tool = DynamicTool::new(config, bg_tx.clone());
+        server.register_tool(Box::new(tool));
+        log::info!("Registered MCP Tool: {}", tool_name);
     }
     server
 }

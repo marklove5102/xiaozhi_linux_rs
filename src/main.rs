@@ -20,7 +20,7 @@ use std::sync::Arc;
 use tokio::signal;
 use tokio::sync::mpsc;
 use uuid::Uuid;
-use crate::mcp_gateway::init_mcp_gateway;
+use crate::mcp_gateway::{init_mcp_gateway, BackgroundTaskResult};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -66,7 +66,10 @@ async fn main() -> anyhow::Result<()> {
         println!("MCP Gateway is disabled.");
         vec![]
     };
-    let mcp_server = Arc::new(init_mcp_gateway(mcp_configs));
+
+    // 后台任务通知通道：从 DynamicTool 后台任务 -> CoreController
+    let (tx_bg, mut rx_bg) = mpsc::channel::<BackgroundTaskResult>(32);
+    let mcp_server = Arc::new(init_mcp_gateway(mcp_configs, tx_bg));
 
     // 创建通道，用于组件间通信
     // 事件通道
@@ -155,6 +158,7 @@ async fn main() -> anyhow::Result<()> {
             Some(event) = rx_net_event.recv() => controller.handle_net_event(event).await,
             Some(event) = rx_audio_event.recv() => controller.handle_audio_event(event).await,
             Some(event) = rx_gui_event.recv() => controller.handle_gui_event(event).await,
+            Some(bg_result) = rx_bg.recv() => controller.handle_background_result(bg_result).await,
         }
     }
     Ok(())
