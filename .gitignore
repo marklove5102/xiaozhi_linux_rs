@@ -5,9 +5,6 @@
 # 忽略编译结果
 /target
 
-# 忽略生成的config文件
-xiaozhi_config.json
-
 # 忽略编译中间文件
 uclibc_stub/
 third_party/
