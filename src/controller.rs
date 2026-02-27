@@ -133,14 +133,20 @@ impl CoreController {
             }
             "tts" => {
                 if let Some(state) = &msg.state {
-                    if state == "start" {
+                    if state == "start" || state == "sentence_start" {
                         self.should_mute_mic = true;
                         self.state = SystemState::Speaking;
-                        log::info!("TTS Started, muting mic for AEC");
-                    } else if state == "stop" {
+                        log::info!("TTS Started (state={}), muting mic for AEC, sending state 6 to GUI", state);
+                        if let Err(e) = self.gui_bridge.send_message(r#"{"state": 6}"#).await {
+                            log::error!("Failed to send state 6 to GUI: {}", e);
+                        }
+                    } else if state == "stop" || state == "sentence_end" {
                         self.should_mute_mic = false;
                         self.state = SystemState::Idle;
-                        log::info!("TTS Stopped, unmuting mic");
+                        log::info!("TTS Stopped (state={}), unmuting mic, sending state 3 to GUI", state);
+                        if let Err(e) = self.gui_bridge.send_message(r#"{"state": 3}"#).await {
+                            log::error!("Failed to send state 3 to GUI: {}", e);
+                        }
                         self.send_auto_listen_command().await;
                     }
                 }
