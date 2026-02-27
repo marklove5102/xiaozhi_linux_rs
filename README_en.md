@@ -74,10 +74,6 @@ graph TD
     style MCP fill:#efe,stroke:#888,stroke-width:2px
 ```
 
-- **Network Module**: Maintains WebSocket long connection with Xiaozhi server, handles heartbeat keepalive and reconnection on disconnection
-- **Audio Processing**: Integrates ALSA for input/output, Opus codec, SpeexDSP real-time processing (noise reduction, AGC, resampling)
-- **Business Logic**: State machine management, device activation, command dispatch, OTA management
-
 ## ✨ Features
 
 ### Implemented Features
@@ -148,6 +144,8 @@ graph TD
 - **armv7-unknow-linux-uclibceabihf**
   - [Luckfox Pico series](https://wiki.luckfox.com/en/Luckfox-Pico-RV1106/) (Rockchip RV1106)
   - [Echo-Mate Desktop Robot](https://github.com/No-Chicken/Echo-Mate) (Rockchip RV1106)
+- **armv7-unknow-linux-gnueabihf**
+  - [Luckfox Lyra series](https://wiki.luckfox.com/en/Luckfox-Lyra/Introduction) (Rockchip RK3506)
 - **aarch64-unknown-linux-gnu**
   - [Dshanpi-A1](https://wiki.dshanpi.org/docs/DshanPi-A1/intro/) (Rockchip RK3576)
 - **x86_64-unknown-linux-gnu**
@@ -187,7 +185,7 @@ cargo run --release
 #### Example: Compiling for Luckfox Pico (RV1106)
 
 ```bash
-# Audio libraries need to be enabled in buildroot sdk
+# No need to prepare the sdk environment, just use the cross-compilation script directly, it will automatically download the cross-compilation toolchain and dependency libraries, and compile and link them
 
 # Add support for the target
 rustup target add armv7-unknown-linux-uclibceabihf
@@ -204,8 +202,6 @@ rustup component add rust-src --toolchain nightly
 
 ```bash
 [root@luckfox root]# ldd xiaozhi_linux_rs 
-        libspeexdsp.so.1 => /usr/lib/libspeexdsp.so.1 (0xa6edc000)
-        libopus.so.0 => /usr/lib/libopus.so.0 (0xa6e6b000)
         libasound.so.2 => /usr/lib/libasound.so.2 (0xa6d72000)
         libgcc_s.so.1 => /lib/libgcc_s.so.1 (0xa6d43000)
         libc.so.0 => /lib/libc.so.0 (0xa6cb4000)

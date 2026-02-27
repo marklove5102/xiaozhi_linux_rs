@@ -78,10 +78,6 @@ graph TD
     style MCP fill:#efe,stroke:#888,stroke-width:2px
 ```
 
-- **网络模块**：维护与小智服务器的 WebSocket 长连接，处理心跳保活与断线重连
-- **音频处理**：集成 ALSA 进行输入/输出，Opus 编解码，SpeexDSP 实时处理（降噪、AGC、重采样）
-- **业务逻辑**：状态机管理、设备激活、指令分发、OTA 管理
-
 ## ✨ 功能
 
 ### 已实现的功能
@@ -153,6 +149,8 @@ graph TD
 - **armv7-unknow-linux-uclibceabihf**
   - [Luckfox pico 系列](https://wiki.luckfox.com/zh/Luckfox-Pico-RV1106/)（Rockchip RV1106）
   - [Echo-Mate 桌面机器人](https://github.com/No-Chicken/Echo-Mate) （Rockchip RV1106）
+- **armv7-unknow-linux-gnueabihf**
+  - [Luckfox Lyra 系列](https://wiki.luckfox.com/zh/Luckfox-Lyra/Introduction) （Rockchip RK3506）
 - **aarch64-unknown-linux-gnu**
   - [Dshanpi-A1](https://wiki.dshanpi.org/docs/DshanPi-A1/intro/) (Rockchip RK3576)
 - **x86_64-unknown-linux-gnu**
@@ -194,7 +192,7 @@ cargo run --release
 #### 以编译到 Luckfox Pico (RV1106) 为例
 
 ```bash
-# 需要在 buildroot sdk 中启用相关音频库
+# 不需要准备 sdk 环境，直接使用交叉编译脚本即可，它会自动下载交叉编译工具链和依赖库，并进行编译和链接
 
 # 添加对应目标支持
 rustup target add armv7-unknown-linux-uclibceabihf
@@ -211,8 +209,6 @@ rustup component add rust-src --toolchain nightly
 
 ```bash
 [root@luckfox root]# ldd xiaozhi_linux_rs 
-        libspeexdsp.so.1 => /usr/lib/libspeexdsp.so.1 (0xa6edc000)
-        libopus.so.0 => /usr/lib/libopus.so.0 (0xa6e6b000)
         libasound.so.2 => /usr/lib/libasound.so.2 (0xa6d72000)
         libgcc_s.so.1 => /lib/libgcc_s.so.1 (0xa6d43000)
         libc.so.0 => /lib/libc.so.0 (0xa6cb4000)

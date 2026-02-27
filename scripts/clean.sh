@@ -46,7 +46,7 @@ if [ -d "third_party" ]; then
             echo "深度清理 third_party/$target_name/ (包括工具链)"
             rm -rf "$target_dir"
         else
-            # 只清理 build 和 sysroot，保留工具链 (*-cross)
+            # 只清理 build、sysroot 和 alsa-shared，保留工具链 (*-cross)
             if [ -d "${target_dir}build" ]; then
                 echo "清理 third_party/$target_name/build/"
                 rm -rf "${target_dir}build"
@@ -54,6 +54,10 @@ if [ -d "third_party" ]; then
             if [ -d "${target_dir}sysroot" ]; then
                 echo "清理 third_party/$target_name/sysroot/"
                 rm -rf "${target_dir}sysroot"
+            fi
+            if [ -d "${target_dir}alsa-shared" ]; then
+                echo "清理 third_party/$target_name/alsa-shared/"
+                rm -rf "${target_dir}alsa-shared"
             fi
         fi
     done

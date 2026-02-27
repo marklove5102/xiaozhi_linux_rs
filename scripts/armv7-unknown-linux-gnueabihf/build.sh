@@ -3,6 +3,8 @@ set -e
 
 # 加载共用下载函数（支持重试 + wget/curl 自动切换）
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../download_helper.sh"
+# 加载 ALSA 共享库交叉编译函数
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../build_alsa.sh"
 
 # =============================================================================
 # armv7-unknown-linux-gnueabihf 混合链接编译脚本
@@ -12,11 +14,6 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../download_helper.sh"
 #   2. 下载并交叉编译 opus、speexdsp 为静态库（.a）
 #   3. ALSA 动态链接系统的 libasound.so，Opus/SpeexDSP 静态链接
 #
-# ALSA 动态链接策略优势：
-#   - 动态链接 libc + libasound，避免 GLIBC ABI 不匹配导致的 segfault
-#   - 支持 dlopen 加载板子上的 ALSA 插件（如 PulseAudio）
-#   - "default" 音频设备名可正常工作
-#   - Opus/SpeexDSP 静态打入，部署时无需额外拷贝 .so 文件
 #
 # 前置要求（CI 中自动安装）：
 #   sudo dpkg --add-architecture armhf
@@ -110,63 +107,8 @@ export CFLAGS="-fPIC"
 export CXXFLAGS="-fPIC"
 
 # --- 2A. 编译 alsa-lib（共享库，仅用于链接时符号解析）---
-echo ""
-echo "=== Step 2A: 编译 alsa-lib ${ALSA_VERSION} (共享库 .so，仅链接时使用) ==="
+build_alsa_shared "$TARGET_DIR" "$BUILD_DIR" "$CROSS_PREFIX" "$ALSA_VERSION" "$NPROC"
 
-ALSA_SRC_DIR="$BUILD_DIR/alsa-lib-${ALSA_VERSION}"
-ALSA_INSTALL_DIR="$TARGET_DIR/alsa-shared"
-if [ -f "$ALSA_INSTALL_DIR/usr/lib/libasound.so" ]; then
-    echo "alsa-lib 共享库已存在，跳过编译。"
-else
-    ALSA_TARBALL="alsa-lib-${ALSA_VERSION}.tar.bz2"
-    ALSA_URL="https://github.com/Hyrsoft/xiaozhi_linux_rs/releases/download/Source_Mirror/${ALSA_TARBALL}"
-
-    if [ ! -d "$ALSA_SRC_DIR" ]; then
-        echo "下载 alsa-lib..."
-        download_file "$ALSA_URL" "$BUILD_DIR/${ALSA_TARBALL}"
-        echo "解压 alsa-lib..."
-        tar -xjf "$BUILD_DIR/${ALSA_TARBALL}" -C "$BUILD_DIR"
-        rm -f "$BUILD_DIR/${ALSA_TARBALL}"
-    fi
-
-    cd "$ALSA_SRC_DIR"
-    # 清理之前可能存在的静态编译产物
-    make distclean 2>/dev/null || true
-    echo "配置 alsa-lib (共享库模式)..."
-    # LDFLAGS="-Wl,--as-needed": 仅为 libasound.so 实际使用符号的库添加 DT_NEEDED
-    # 避免 libpthread.so.0 等作为间接依赖被加载，导致旧版 ld 的 --as-needed 冲突
-    ./configure \
-        --host="${CROSS_PREFIX}" \
-        --enable-shared \
-        --disable-static \
-        --disable-python \
-        --disable-alisp \
-        --disable-old-symbols \
-        --disable-topology \
-        --with-configdir="/usr/share/alsa" \
-        --with-plugindir="/usr/lib/alsa-lib" \
-        --prefix="/usr" \
-        LDFLAGS="-Wl,--as-needed" \
-        --quiet
-
-    echo "编译 alsa-lib (使用 ${NPROC} 线程)..."
-    make -j"$NPROC" --quiet
-    mkdir -p "$ALSA_INSTALL_DIR"
-    make DESTDIR="$ALSA_INSTALL_DIR" install --quiet
-
-    # 修正 alsa.pc 中的 prefix 路径：/usr → 实际安装绝对路径
-    # 否则 pkg-config 会返回 -L/usr/lib，指向宿主机的 x86_64 库
-    sed -i "s|prefix=/usr|prefix=$ALSA_INSTALL_DIR/usr|" "$ALSA_INSTALL_DIR/usr/lib/pkgconfig/alsa.pc"
-
-echo "alsa-lib 共享库编译完成!"
-fi
-
-ALSA_SHARED_LIBDIR="$ALSA_INSTALL_DIR/usr/lib"
-ALSA_SHARED_PKGCONFIG="$ALSA_INSTALL_DIR/usr/lib/pkgconfig"
-echo "ALSA 共享库: $ALSA_SHARED_LIBDIR"
-ls -la "$ALSA_SHARED_LIBDIR"/libasound.so* 2>/dev/null || true
-
-cd "$PROJECT_ROOT"
 
 # =============================================================================
 # 3. 设置 Rust 交叉编译环境
