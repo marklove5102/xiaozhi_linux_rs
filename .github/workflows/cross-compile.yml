@@ -29,7 +29,6 @@ jobs:
       - name: Install Rust nightly
         uses: dtolnay/rust-toolchain@nightly
         with:
-          targets: armv7-unknown-linux-uclibceabihf
           components: rust-src
 
       - name: Install build dependencies
