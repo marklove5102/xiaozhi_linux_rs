@@ -172,7 +172,7 @@ if [ -f "$OUTPUT_BIN" ]; then
     echo "文件大小: $(du -h "$OUTPUT_BIN" | cut -f1)"
     echo ""
     echo "文件信息:"
-    file "$OUTPUT_BIN"
+    command -v file >/dev/null 2>&1 && file "$OUTPUT_BIN" || echo "  (file command not available)"
     echo ""
     echo "提示: 可使用以下命令验证链接方式:"
     echo "  file $OUTPUT_BIN"
